@@ -599,7 +599,7 @@ function ReviewScreen({proposal, reviewer, slot, onBack, onDone}){
   const [debugInfo,setDebugInfo]=useState("");
   const [showAI,setShowAI]=useState(true);
   const [showPDF,setShowPDF]=useState(false);
-  const [pdfUrl,setPdfUrl]=useState(null);
+  const pdfFileRef=useRef(null);
   const fileRef=useRef();
 
   const scored = RUBRIK.filter(r=>scores[r.id]!==undefined).length;
@@ -618,18 +618,13 @@ function ReviewScreen({proposal, reviewer, slot, onBack, onDone}){
   const rec=getRec(total);
 
   // PDF processing
-  const pdfUrlRef = useRef(null);
   const processFile=async(file)=>{
     if(!file)return;
     if(file.type!=="application/pdf"){setPdfError("Hanya file PDF.");return;}
     if(file.size>20*1024*1024){setPdfError("Maks 20 MB.");return;}
     setPdfError("");setIsExtracting(true);
     setFileInfo({name:file.name,size:(file.size/1024).toFixed(0)});
-    // Buat URL untuk preview PDF - simpan di ref DAN state
-    if(pdfUrlRef.current) URL.revokeObjectURL(pdfUrlRef.current);
-    const newUrl = URL.createObjectURL(file);
-    pdfUrlRef.current = newUrl;
-    setPdfUrl(newUrl);
+    pdfFileRef.current = file; // simpan file asli
     try{
       const{text,totalPages,extractedPages}=await extractPDF(file);
       if(!text||text.length<50){setPdfError("PDF tidak bisa dibaca (kemungkinan scan/gambar).");setIsExtracting(false);return;}
@@ -637,6 +632,14 @@ function ReviewScreen({proposal, reviewer, slot, onBack, onDone}){
       setFileInfo(f=>({...f,totalPages,extractedPages,chars:text.length}));
     }catch(e){setPdfError("Gagal baca PDF: "+e.message);}
     finally{setIsExtracting(false);}
+  };
+  
+  const openPDF=()=>{
+    if(!pdfFileRef.current)return;
+    const url=URL.createObjectURL(pdfFileRef.current);
+    window.open(url,'_blank');
+    // revoke setelah delay
+    setTimeout(()=>URL.revokeObjectURL(url),10000);
   };
 
   // AI Analysis
@@ -881,11 +884,11 @@ Balas HANYA JSON (tanpa markdown):
                   </div>
                 )}
               </div>
-              {pdfText&&pdfUrl&&(
+              {pdfText&&(
                 <button
-                  onClick={e=>{e.stopPropagation();setShowPDF(true);}}
+                  onClick={openPDF}
                   className="w-full flex items-center justify-center gap-2 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 font-semibold text-sm py-2.5 rounded-xl transition-all">
-                  👁 Lihat PDF Proposal
+                  👁 Buka PDF di Tab Baru
                 </button>
               )}
               {pdfError&&<div className="text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">❌ {pdfError}</div>}
@@ -1165,22 +1168,7 @@ Balas HANYA JSON (tanpa markdown):
                 className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white font-bold px-6 py-3 rounded-xl text-sm shadow transition-all">
                 🖨️ Cetak / Simpan PDF
               </button>
-            {/* PDF VIEWER MODAL */}
-            {showPDF&&pdfUrl&&(
-              <div className="fixed inset-0 bg-black/80 z-50 flex flex-col">
-                <div className="bg-white px-4 py-3 flex items-center justify-between shrink-0">
-                  <div>
-                    <span className="font-bold text-slate-800 text-sm">📄 {fileInfo?.name}</span>
-                    <span className="text-xs text-slate-400 ml-2">{fileInfo?.size} KB</span>
-                  </div>
-                  <button onClick={()=>setShowPDF(false)}
-                    className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg font-semibold text-sm">
-                    ✕ Tutup
-                  </button>
-                </div>
-                <iframe src={pdfUrlRef.current||pdfUrl} className="flex-1 w-full border-0" title="PDF Preview"/>
-              </div>
-            )}
+
                           <button onClick={()=>{
                 onDone(proposal.no,{
                   proposal, reviewer, slot,
