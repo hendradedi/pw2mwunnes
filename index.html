@@ -618,15 +618,18 @@ function ReviewScreen({proposal, reviewer, slot, onBack, onDone}){
   const rec=getRec(total);
 
   // PDF processing
-  const processFile=useCallback(async(file)=>{
+  const pdfUrlRef = useRef(null);
+  const processFile=async(file)=>{
     if(!file)return;
     if(file.type!=="application/pdf"){setPdfError("Hanya file PDF.");return;}
     if(file.size>20*1024*1024){setPdfError("Maks 20 MB.");return;}
     setPdfError("");setIsExtracting(true);
     setFileInfo({name:file.name,size:(file.size/1024).toFixed(0)});
-    // Buat URL untuk preview PDF
-    if(pdfUrl) URL.revokeObjectURL(pdfUrl);
-    setPdfUrl(URL.createObjectURL(file));
+    // Buat URL untuk preview PDF - simpan di ref DAN state
+    if(pdfUrlRef.current) URL.revokeObjectURL(pdfUrlRef.current);
+    const newUrl = URL.createObjectURL(file);
+    pdfUrlRef.current = newUrl;
+    setPdfUrl(newUrl);
     try{
       const{text,totalPages,extractedPages}=await extractPDF(file);
       if(!text||text.length<50){setPdfError("PDF tidak bisa dibaca (kemungkinan scan/gambar).");setIsExtracting(false);return;}
@@ -634,7 +637,7 @@ function ReviewScreen({proposal, reviewer, slot, onBack, onDone}){
       setFileInfo(f=>({...f,totalPages,extractedPages,chars:text.length}));
     }catch(e){setPdfError("Gagal baca PDF: "+e.message);}
     finally{setIsExtracting(false);}
-  },[pdfUrl]);
+  };
 
   // AI Analysis
   const doAnalyze=async()=>{
@@ -1175,7 +1178,7 @@ Balas HANYA JSON (tanpa markdown):
                     ✕ Tutup
                   </button>
                 </div>
-                <iframe src={pdfUrl} className="flex-1 w-full border-0" title="PDF Preview"/>
+                <iframe src={pdfUrlRef.current||pdfUrl} className="flex-1 w-full border-0" title="PDF Preview"/>
               </div>
             )}
                           <button onClick={()=>{
