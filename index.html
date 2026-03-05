@@ -480,7 +480,8 @@ function LoginScreen({onLogin}){
 // ══════════════════════════════════════
 function DashboardScreen({reviewer, onSelect, onLogout, doneSet, onAdmin}){
   const proposals = PROPOSALS_DATA.filter(p=>p.r1===reviewer||p.r2===reviewer);
-  const done = proposals.filter(p=>doneSet.has(p.no)).length;
+  const isR1=(p)=>p.r1===reviewer;
+  const done = proposals.filter(p=>doneSet.has(p.no+"-"+(isR1(p)?1:2))).length;
   const [search,setSearch]=useState("");
   const [filter,setFilter]=useState("all");
   const pct = proposals.length ? Math.round(done/proposals.length*100) : 0;
@@ -488,7 +489,8 @@ function DashboardScreen({reviewer, onSelect, onLogout, doneSet, onAdmin}){
   const list = proposals.filter(p=>{
     const s=search.toLowerCase();
     const ok=!s||p.ketua.toLowerCase().includes(s)||p.judul.toLowerCase().includes(s)||String(p.no).includes(s);
-    const isDone=doneSet.has(p.no);
+    const isR1x=p.r1===reviewer;
+    const isDone=doneSet.has(p.no+"-"+(isR1x?1:2));
     return ok&&(filter==="all"||(filter==="done"&&isDone)||(filter==="todo"&&!isDone));
   });
 
@@ -546,7 +548,7 @@ function DashboardScreen({reviewer, onSelect, onLogout, doneSet, onAdmin}){
         <div className="space-y-2">
           {list.map(p=>{
             const isR1=p.r1===reviewer;
-            const isDone=doneSet.has(p.no);
+            const isDone=doneSet.has(p.no+"-"+(isR1?1:2));
             return(
               <div key={`${p.no}-${isR1?1:2}`} onClick={()=>onSelect(p,isR1?1:2)}
                 className={`bg-white rounded-2xl border-2 p-4 cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all fade-in
@@ -1218,8 +1220,9 @@ function App(){
   });
 
   const markDone=(no, reviewData)=>{
+    const slotKey = no+"-"+(reviewData?.slot||1);
     setDoneSet(prev=>{
-      const n=new Set(prev);n.add(no);
+      const n=new Set(prev);n.add(slotKey);
       try{localStorage.setItem("p2mw26_done",JSON.stringify([...n]));}catch{}
       return n;
     });
