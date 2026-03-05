@@ -8,13 +8,14 @@
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
   <style>
     body{font-family:'Plus Jakarta Sans',sans-serif;}
     @keyframes spin{to{transform:rotate(360deg);}}
     .spin{animation:spin 1s linear infinite;}
     @keyframes fadeIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
-    .fade-in{animation:fadeIn .3s ease;}
+    .fade-in{animation:fadeIn .25s ease;}
     @media print{
       .no-print{display:none!important;}
       body{background:white!important;}
@@ -25,256 +26,254 @@
 <body class="bg-slate-100 min-h-screen">
 <div id="root"></div>
 <script type="text/babel">
-const { useState, useRef, useEffect, useCallback, useMemo } = React;
+const { useState, useRef, useEffect, useCallback } = React;
 
-// ═══════════════════════════════════════════════════════
-//  ⚙️  KONFIGURASI — HANYA EDIT BAGIAN INI
-// ═══════════════════════════════════════════════════════
-const GEMINI_API_KEY = "AIzaSyBAtAcyRk6BhyCaiDGUsCkyGCinE0TtFH0"; // ← isi API key di sini
-const GEMINI_MODEL   = "gemini-2.0-flash";
+// ╔══════════════════════════════════════════════════════╗
+// ║  ⚙️  KONFIGURASI — GANTI API KEY DI SINI            ║
+// ╚══════════════════════════════════════════════════════╝
+const ZAI_API_KEY = "fd3e4aa6b95749509ad981fcfc41e90c.BlG2Ehm7CPmvCSTk";
+//  Cara dapat API key GRATIS:
+//  1. Buka https://z.ai/model-api → Sign Up (pakai Google)
+//  2. Buka https://z.ai/manage-apikey/apikey-list
+//  3. Klik "Create API Key" → copy → paste di atas
+const ZAI_MODEL   = "glm-4.7-flash"; // GRATIS ✓
+const ZAI_URL     = "https://api.z.ai/api/paas/v4/chat/completions";
 // ═══════════════════════════════════════════════════════
 
 const PROPOSALS_DATA = [{"no":1,"ketua":"INDY PUTRI SYAHARANI","nim":"2407040005","prodi":"Ekonomi Pembangunan, S1","fakultas":"FEB","judul":"HerbaStrip: Inovasi Produk Minuman Herbal Berbasis Strip Edible untuk Mendukung Konsep Healthy Lifestyle dan Ramah Lingkungan","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Yanesti Nuravianda Lestari, S.Gz., M.Gizi","r2":"Khairul Arifin, M.Pd."},{"no":2,"ketua":"ERFI NAFASA FADHILAH PUTRI","nim":"2407040238","prodi":"Ekonomi Pembangunan, S1","fakultas":"FEB","judul":"CrunchyKat: Inovasi Alternatif Snack ASI Booster Daun Katuk Bagi Ibu Menyusui dalam Mendukung SDGs Poin Ketiga Sebagai Upaya Mengurangi Angka Stunting","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Hendra Dedi Kriswanto, S.Pd., M.Pd","r2":"Dr. Nurul Fatimah, S.Pd. M.Si"},{"no":3,"ketua":"ILMA NAYLIL FAUZIE","nim":"2402140009","prodi":"Pendidikan Bahasa dan Sastra Jawa, S1","fakultas":"FBS","judul":"Gummu Gummy: Inovasi Permen Herbal dengan Formulasi Centella Asiatica dan Almond dalam Meningkatkan Kualitas Tidur","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Devy Lestari, S.Pd., M.Pd.","r2":"Yanesti Nuravianda Lestari, S.Gz., M.Gizi"},{"no":4,"ketua":"Alfiani Nova","nim":"2407120004","prodi":"Pendidikan Administrasi Perkantoran, S1","fakultas":"FEB","judul":"PUMPKIES: INOVASI BIJI LABU KUNING DAN LABU KUNING MENJADI BAHAN  BAKU COOKIES SEBAGAI UPAYA PENURUNAN KASUS ANEMIA","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Ria Fitrasih, S.Pd., M.Pd","r2":"Khairul Arifin, M.Pd."},{"no":5,"ketua":"MARTHA DWI ROSIKA","nim":"2306020024","prodi":"Pendidikan Jasmani Sekolah Dasar, S1","fakultas":"FIK","judul":"Pengembangan Usaha Minuman Sehat “PureDay Infused Water” Berbasis Bahan Alami untuk Mendukung Gaya Hidup Sehat Mahasiswa","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Yanesti Nuravianda Lestari, S.Gz., M.Gizi","r2":"Yustina Dhian Novita, SH., MH"},{"no":6,"ketua":"Chalsabila Mutiara Maedy","nim":"2407120036","prodi":"Pendidikan Administrasi Perkantoran, S1","fakultas":"FEB","judul":"SormaCookies: Inovasi Cookies Bebas Gluten berbasis Tepung Sorgum dengan Fortifikasi Kurma sebagai Camilan Sehat Kaya Serat","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Khairul Arifin, M.Pd.","r2":"Dr. sc. hum. Chatila Maharani, ST., M.Kes"},{"no":7,"ketua":"FREDENSYAH","nim":"2407120044","prodi":"Pendidikan Administrasi Perkantoran, S1","fakultas":"FEB","judul":"SELAINA: INOVAI SELAI BUAH NAGA SEBAGAI PRODUK OLAHAN BERNILAI TAMBAH BERBASIS POTENSI LOKAL","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Juwita Ria Rumondang, S.Pd., M.Pd.","r2":"Hendra Dedi Kriswanto, S.Pd., M.Pd"},{"no":8,"ketua":"NATHASYA PUTRI RATU","nim":"2404030027","prodi":"Matematika, S1","fakultas":"FMIPA","judul":"HerbaGly: Inovasi Bubuk Cincau Hijau Kombinasi Perisa Alami Kayu Manis sebagai  Pangan Fungsional Pencegah Diabetes","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Hendra Dedi Kriswanto, S.Pd., M.Pd","r2":"Khairul Arifin, M.Pd."},{"no":9,"ketua":"FADIA AUNI FIRZANA","nim":"2303070073","prodi":"Pendidikan Sosiologi dan Antropologi, S1","fakultas":"FISIP","judul":"VITA-CHUE : INOVASI HIGH FIBER BOBA BERBASIS KOLANG-KOLING SEBAGAI ALTERNATIF TOPPING MINUMAN SEHAT","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Dwi Pangesti Aprilia, S.Pd., M.Pd","r2":"Yanesti Nuravianda Lestari, S.Gz., M.Gizi"},{"no":10,"ketua":"Ayu Tri Lestari","nim":"2307010156","prodi":"Pendidikan Ekonomi (Pendidikan Administrasi Perkantoran), S1","fakultas":"FEB","judul":"Vitagoal Sport Drink: Inovasi Minuman Rehidrasi Alami untuk Memelihara Kapasitas Jantung Paru dan Pemulihan Denyut Nadi Pada Atlet","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Yustina Dhian Novita, SH., MH","r2":"Dr. sc. hum. Chatila Maharani, ST., M.Kes"},{"no":11,"ketua":"AR IKA ENDRY ARYA PUTRI","nim":"2409030009","prodi":"Gizi, S1","fakultas":"FK","judul":"FIPROBAR : INOVASI SNACK BAR FUNGSIONAL GURIH TINGGI PROTEIN–SERAT BERBASIS DADA AYAM SERTA TEPUNG KULIT PISANG SEBAGAI PENDUKUNG AKTIVITAS SERTA PEMENUHAN GIZI REMAJA","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Hendra Dedi Kriswanto, S.Pd., M.Pd","r2":"Erisa Aprilia Wicaksari, SE., MM"},{"no":12,"ketua":"DINNA WAHYU SAGITA","nim":"2403130016","prodi":"Ilmu Komunikasi, S1","fakultas":"FISIP","judul":"NETRALIN: Inovasi Minuman Functional First-Aid Bebas Laktosa Berbasis Susu Oat dan Pati Garut sebagai Solusi Cepat Iritasi Lambung Akibat Tren Makanan Ultra-Spicy","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Dwi Pangesti Aprilia, S.Pd., M.Pd","r2":"Yustina Dhian Novita, SH., MH"},{"no":13,"ketua":"INDAH RAHMAWATI","nim":"2403080152","prodi":"Pendidikan Ilmu Pengetahuan Sosial, S1","fakultas":"FISIP","judul":"BOTANICA BAKES: INOVASI BROWNIES KERING BERBASIS BOTANICA SEBAGAI FUNCTIONAL LOW GLYCEMIC SNACK BAGI PENDERITA DIABETES","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Ayutisa Rizqinada, S.Pd., M.Pd","r2":"Dwi Pangesti Aprilia, S.Pd., M.Pd"},{"no":14,"ketua":"NAELLY PUTRI AZ-ZAHRA","nim":"2407120046","prodi":"Pendidikan Administrasi Perkantoran, S1","fakultas":"FEB","judul":"Zapolara: Transformasi Buah Sawo menjadi Pemanis Cair Fungsional Bernilai Ekonomi.","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Ayutisa Rizqinada, S.Pd., M.Pd","r2":"Dr. sc. hum. Chatila Maharani, ST., M.Kes"},{"no":15,"ketua":"REVA MARYAM BADRID DUJA","nim":"2407120124","prodi":"Pendidikan Administrasi Perkantoran, S1","fakultas":"FEB","judul":"\"Pengembangan Usaha Sandwich Strawberry sebagai Camilan Sehat dan Praktis untuk Mahasiswa\"","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Dr. Nurul Fatimah, S.Pd. M.Si","r2":"Hendra Dedi Kriswanto, S.Pd., M.Pd"},{"no":16,"ketua":"DIVA LATIFUNNISA'","nim":"2407120030","prodi":"Pendidikan Administrasi Perkantoran, S1","fakultas":"FEB","judul":"PENGEMBANGAN USAHA BONGIES: PREMIX BROWNIES GLUTEN-FREE DARI LIMBAH BONGGOL BROKOLI YANG BERNILAI EKONOMIS TINGGI","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Ria Fitrasih, S.Pd., M.Pd","r2":"Juwita Ria Rumondang, S.Pd., M.Pd."},{"no":17,"ketua":"TASIA NORKOMALA","nim":"2407120048","prodi":"Pendidikan Administrasi Perkantoran, S1","fakultas":"FEB","judul":"Pengembangan Produk Es Krim Fungsional dari Kulit Semangka sebagai Solusi Inovasi Pangan Berkelanjutan","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Devy Lestari, S.Pd., M.Pd.","r2":"Dr. Nurul Fatimah, S.Pd. M.Si"},{"no":18,"ketua":"NABILLA DESILVIARINO","nim":"2307010013","prodi":"Pendidikan Ekonomi (Pendidikan Administrasi Perkantoran), S1","fakultas":"FEB","judul":"Sirkutea: Hilirisasi Limbah Kulit Buah menjadi Minuman Herbal Inovatif Berbasis Ekonomi Sirkular dan Zero Waste","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Ria Fitrasih, S.Pd., M.Pd","r2":"Dwi Pangesti Aprilia, S.Pd., M.Pd"},{"no":19,"ketua":"MARDHIYYA NAYLA YUSUF","nim":"2405130022","prodi":"Pendidikan Tata Kecantikan, S1","fakultas":"FT","judul":"Pengembangan Ice Cream Beras Kencur sebagai Dessert Herbal Anti-Inflamasi dan Anti-Aging","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Devy Lestari, S.Pd., M.Pd.","r2":"Khairul Arifin, M.Pd."},{"no":20,"ketua":"CINDY YOBELINA TIURMAIDA LUMBAN TORUAN","nim":"2307010119","prodi":"Pendidikan Ekonomi (Pendidikan Administrasi Perkantoran), S1","fakultas":"FEB","judul":"FIBOCAL Cookies : Eco-Innovation High Calcium Snack untuk Pencegahan Hipokalsemia melalui Pemanfaatan Limbah Tulang Ikan","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Khairul Arifin, M.Pd.","r2":"Juwita Ria Rumondang, S.Pd., M.Pd."},{"no":21,"ketua":"LU'LU' YAZIDATUL CHASANAH","nim":"2405150077","prodi":"Pendidikan Tata Boga, S1","fakultas":"FT","judul":"FishyFit: Permen Fungsional Tinggi Kalsium dari Limbah Tulang Ikan dengan Pemanis Alami sebagai Upaya Pencegahan Karies Gigi","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Khairul Arifin, M.Pd.","r2":"Devy Lestari, S.Pd., M.Pd."},{"no":22,"ketua":"ASHIFA AQILLA RAHMAWATI","nim":"2407120099","prodi":"Pendidikan Administrasi Perkantoran, S1","fakultas":"FEB","judul":"D'TEA CARICA INOVASI TEH HERBAL DENGAN EKSTRAK DAUN CARICA PUBESCENS SEBAGAI ALTERNATIF PRODUK ANTIHIPERTENSI","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Devy Lestari, S.Pd., M.Pd.","r2":"Dr. sc. hum. Chatila Maharani, ST., M.Kes"},{"no":23,"ketua":"ELMA AYU OKTAVIA","nim":"2407120086","prodi":"Pendidikan Administrasi Perkantoran, S1","fakultas":"FEB","judul":"Arunika Jagavila","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Dr. Nurul Fatimah, S.Pd. M.Si","r2":"Hendra Dedi Kriswanto, S.Pd., M.Pd"},{"no":24,"ketua":"DICKY MARZUQ UTOMO","nim":"2407120028","prodi":"Pendidikan Administrasi Perkantoran, S1","fakultas":"FEB","judul":"NUGGET DAUN KELOR BANDENG KHAS SEMAARANG GUNA MENCEGAH STUNTING PADA ANAK KOTA SEMARANG","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Ayutisa Rizqinada, S.Pd., M.Pd","r2":"Yustina Dhian Novita, SH., MH"},{"no":25,"ketua":"NAFHIZA ARINDA WIDIARINI","nim":"2407120093","prodi":"Pendidikan Administrasi Perkantoran, S1","fakultas":"FEB","judul":"ARENERGY: PERMEN ENERGI ALAMI BERBASIS GULA AREN","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Khairul Arifin, M.Pd.","r2":"Juwita Ria Rumondang, S.Pd., M.Pd."},{"no":26,"ketua":"YUMROTUN NUR KHASANAH","nim":"2407120079","prodi":"Pendidikan Administrasi Perkantoran, S1","fakultas":"FEB","judul":"Inovasi Jamu Herbal dan Sayuran Menjadi Es Krim Sehat Rendah Gula","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Khairul Arifin, M.Pd.","r2":"Yustina Dhian Novita, SH., MH"},{"no":27,"ketua":"MARSANDIKA AULYA PUTRI CANTIKA","nim":"2505020141","prodi":"Teknik Sipil, S1","fakultas":"FT","judul":"SpieCrew","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Dr. Nurul Fatimah, S.Pd. M.Si","r2":"Dr. sc. hum. Chatila Maharani, ST., M.Kes"},{"no":28,"ketua":"AHMAT MUSTOFA","nim":"2407010124","prodi":"Pendidikan Akuntansi, S1","fakultas":"FEB","judul":"Penguatan Industri Perikanan Berkelanjutan melalui Inovasi Abon Ikan Nila sebagai Produk Unggulan Bernilai Tambah.","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Devy Lestari, S.Pd., M.Pd.","r2":"Dr. sc. hum. Chatila Maharani, ST., M.Kes"},{"no":29,"ketua":"AFIFAH MARWA DZAKIYYAH KURNIAWAN","nim":"2407030329","prodi":"Manajemen, S1","fakultas":"FEB","judul":"BILOMELLO: Strategi Transformasi Quesillo melalui Glaze Belimbing Wuluh untuk Menciptakan Diferensiasi Dessert Tropis Berkelanjutan","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Dwi Pangesti Aprilia, S.Pd., M.Pd","r2":"Khairul Arifin, M.Pd."},{"no":30,"ketua":"Firdah Dwi Cahyany","nim":"2407120001","prodi":"Pendidikan Administrasi Perkantoran, S1","fakultas":"FEB","judul":"VeggieBite “Pengembangan Usaha Nugget Ayam Sayur Inovatif sebagai Peluang Wirausaha Mahasiswa Berbasis Pangan Sehat”","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Hendra Dedi Kriswanto, S.Pd., M.Pd","r2":"Dwi Pangesti Aprilia, S.Pd., M.Pd"},{"no":31,"ketua":"WISNU DHARMA WIBISONO","nim":"2306010114","prodi":"Pendidikan Jasmani, Kesehatan, dan Rekreasi, S1","fakultas":"FIK","judul":"NutriNest Healthy Bowl","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Dr. Nurul Fatimah, S.Pd. M.Si","r2":"Khairul Arifin, M.Pd."},{"no":32,"ketua":"RAYHAN RIVALDI","nim":"2407120114","prodi":"Pendidikan Administrasi Perkantoran, S1","fakultas":"FEB","judul":"RE-BITES: PRODUKSI KERIPIK BUAH, SAYUR, DAN UMBI IMPERFECT BERTEKNOLOGI LOW-TEMPERATURE DRYING SEBAGAI CAMILAN TINGGI SERAT TANPA MSG BERBASIS CIRCULAR ECONOMY","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Dwi Pangesti Aprilia, S.Pd., M.Pd","r2":"Khairul Arifin, M.Pd."},{"no":33,"ketua":"PUTRI ARISMA","nim":"2407120127","prodi":"Pendidikan Administrasi Perkantoran, S1","fakultas":"FEB","judul":"PEMBERDAYAAN BAHAN BAKU KUALITAS PANGSIT DALAM INDUSTRI CAMILAN RUMAH TANGGA","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Juwita Ria Rumondang, S.Pd., M.Pd.","r2":"Dr. Nurul Fatimah, S.Pd. M.Si"},{"no":34,"ketua":"SHEVALIA GEFARINA","nim":"2307010014","prodi":"Pendidikan Ekonomi (Pendidikan Administrasi Perkantoran), S1","fakultas":"FEB","judul":"ELVORA BROWNCHIPS: TRANSFORMASI LIMBAH BIJI DURIAN MENJADI TEPUNG SEBAGAI INOVASI BROWNIES KERING BERBASIS ECO LOCAL VALUE FROM WASTE MENUJU BISNIS PANGAN BERKELANJUTAN","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Ayutisa Rizqinada, S.Pd., M.Pd","r2":"Devy Lestari, S.Pd., M.Pd."},{"no":35,"ketua":"NABILA DWI RAHMAWATI","nim":"2307010147","prodi":"Pendidikan Ekonomi (Pendidikan Administrasi Perkantoran), S1","fakultas":"FEB","judul":"Marvie : Inovasi Mie Berbasis Mangrove untuk Diversifikasi Pangan dan Penguatan Ekonomi Pesisir","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Ria Fitrasih, S.Pd., M.Pd","r2":"Devy Lestari, S.Pd., M.Pd."},{"no":36,"ketua":"ALEASSANDRIA ANINDYA ANJANI KRISTIANTO","nim":"2408010149","prodi":"Ilmu Hukum, S1","fakultas":"FH","judul":"ELÈA: Biskuit Puzzle Gluten-Free  Berbahan Limbah Bekatul sebagai Stimulasi Kognitif  di masa Golden Age Untuk Pengalaman Seru dan Mencegah GTM","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Devy Lestari, S.Pd., M.Pd.","r2":"Dwi Pangesti Aprilia, S.Pd., M.Pd"},{"no":37,"ketua":"NUR HIKMAH WATI","nim":"2405070019","prodi":"Teknik Kimia, S1","fakultas":"FT","judul":"OKUBEE: Inovasi Cookies Padat Gizi Berbasis Ampas Susu Kedelai dan Kulit Ubi Kuning Sebagai Upaya Mendukung Pencegahan Stunting","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Yanesti Nuravianda Lestari, S.Gz., M.Gizi","r2":"Dr. Nurul Fatimah, S.Pd. M.Si"},{"no":38,"ketua":"RELLO CHELSI ARAFAT","nim":"2407120126","prodi":"Pendidikan Administrasi Perkantoran, S1","fakultas":"FEB","judul":"CALCIBITE+ : BISKUIT FUNGSIONAL TINGGI KALSIUM DAN ZAT BESI BERBASIS DAUN KELOR UNTUK PENCEGAHAN ANEMIA REMAJA","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Yanesti Nuravianda Lestari, S.Gz., M.Gizi","r2":"Khairul Arifin, M.Pd."},{"no":39,"ketua":"RELLO CHELSI ARAFAT","nim":"2407120126","prodi":"Pendidikan Administrasi Perkantoran, S1","fakultas":"FEB","judul":"CALCIBITE+ : BISKUIT FUNGSIONAL TINGGI KALSIUM DAN ZAT BESI BERBASIS DAUN KELOR UNTUK PENCEGAHAN ANEMIA REMAJA","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Dr. sc. hum. Chatila Maharani, ST., M.Kes","r2":"Ria Fitrasih, S.Pd., M.Pd"},{"no":40,"ketua":"VERLYTA OCTAVIYANI","nim":"2407120055","prodi":"Pendidikan Administrasi Perkantoran, S1","fakultas":"FEB","judul":"PENGEMBANGAN MINUMAN HERBAL BUBUK KAYA ANTIOKSIDAN BERBASIS MORINGA, BUNGA TELANG, JAHE, DAN MADU DALAM MENDUKUNG GAYA HIDUP SEHAT MASYARAKAT MODERN","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Yustina Dhian Novita, SH., MH","r2":"Dwi Pangesti Aprilia, S.Pd., M.Pd"},{"no":41,"ketua":"MUHAMMAD NABIL ATHALLAH","nim":"2306010149","prodi":"Pendidikan Jasmani, Kesehatan, dan Rekreasi, S1","fakultas":"FIK","judul":"Snack Anti Stress Untuk Menjaga Stamina dan Daya Tahan Tubuh","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Ria Fitrasih, S.Pd., M.Pd","r2":"Erisa Aprilia Wicaksari, SE., MM"},{"no":42,"ketua":"NADINE AINUR RAMADHANI","nim":"2407120035","prodi":"Pendidikan Administrasi Perkantoran, S1","fakultas":"FEB","judul":"Inovasi Nugget Kelor Tempe sebagai Makanan Olahan Bergizi dan Ekonomis dalam Upaya Peningkatan Gizi Masyarakat","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Juwita Ria Rumondang, S.Pd., M.Pd.","r2":"Dr. Nurul Fatimah, S.Pd. M.Si"},{"no":43,"ketua":"MUHAMMAD IVAN DWI RAMADHANI","nim":"2306010015","prodi":"Pendidikan Jasmani, Kesehatan, dan Rekreasi, S1","fakultas":"FIK","judul":"IHA FOOD AND BEVERAGE MINUMAN SEHAT KAYA AKAN NUTRISI","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Yanesti Nuravianda Lestari, S.Gz., M.Gizi","r2":"Yustina Dhian Novita, SH., MH"},{"no":44,"ketua":"FELIA AYU RAHARJO","nim":"2407120090","prodi":"Pendidikan Administrasi Perkantoran, S1","fakultas":"FEB","judul":"Inovasi Healthy Fast Food Berbasis Grain untuk Mendukung Gaya Hidup Sehat","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Dwi Pangesti Aprilia, S.Pd., M.Pd","r2":"Devy Lestari, S.Pd., M.Pd."},{"no":45,"ketua":"Hana Clarissa Citta Dewi","nim":"2407120038","prodi":"Pendidikan Administrasi Perkantoran, S1","fakultas":"FEB","judul":"ZBoostBar : Snack Energi & Fokus untuk Gen Z","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Hendra Dedi Kriswanto, S.Pd., M.Pd","r2":"Dwi Pangesti Aprilia, S.Pd., M.Pd"},{"no":46,"ketua":"Zaskia Sabriena Hanindhita","nim":"2407120011","prodi":"Pendidikan Administrasi Perkantoran, S1","fakultas":"FEB","judul":"VERSASIRSA: Potensi Daun Kelor (Moringa Oleifera) Sebagai Alternatif Pengobatan Diabetes Melitus","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Hendra Dedi Kriswanto, S.Pd., M.Pd","r2":"Devy Lestari, S.Pd., M.Pd."},{"no":47,"ketua":"Zaskia Sabriena Hanindhita","nim":"2407120011","prodi":"Pendidikan Administrasi Perkantoran, S1","fakultas":"FEB","judul":"VERSASIRSA: Potensi Daun Kelor (Moringa Oleifera) Sebagai Alternatif Pengobatan Diabetes Melitus","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Juwita Ria Rumondang, S.Pd., M.Pd.","r2":"Dr. Nurul Fatimah, S.Pd. M.Si"},{"no":48,"ketua":"Trisna Elfrida Aritonang","nim":"2306020022","prodi":"Pendidikan Jasmani Sekolah Dasar, S1","fakultas":"FIK","judul":"GomuBite","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Khairul Arifin, M.Pd.","r2":"Dwi Pangesti Aprilia, S.Pd., M.Pd"},{"no":49,"ketua":"APRI CINTA KUMALAYANTI","nim":"2407120006","prodi":"Pendidikan Administrasi Perkantoran, S1","fakultas":"FEB","judul":"Inovasi Produk Nugget Vegan Berbasis Bahan Nabati Sebagai Alternatif Pangan Sehat dan Bergizi Bagi Masyarakat","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Dr. sc. hum. Chatila Maharani, ST., M.Kes","r2":"Devy Lestari, S.Pd., M.Pd."},{"no":50,"ketua":"Alfansa Zakaria","nim":"2407110080","prodi":"Pendidikan Akuntansi, S1","fakultas":"FEB","judul":"Gimmik Fresh: Milkshake Jahe Merah dengan Teknologi Nanoenkapsulasi  Guna Meningkatkan Kesehatan Masyarakat dan Wirausaha Berkelanjutan","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Dwi Pangesti Aprilia, S.Pd., M.Pd","r2":"Ayutisa Rizqinada, S.Pd., M.Pd"},{"no":51,"ketua":"BERDITYA NAIRA SYAFITRI","nim":"2306010109","prodi":"Pendidikan Jasmani, Kesehatan, dan Rekreasi, S1","fakultas":"FIK","judul":"Snack Anti Asam Lambung","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Juwita Ria Rumondang, S.Pd., M.Pd.","r2":"Erisa Aprilia Wicaksari, SE., MM"},{"no":52,"ketua":"HADIYAN LABIB GHANI","nim":"2407120098","prodi":"Pendidikan Administrasi Perkantoran, S1","fakultas":"FEB","judul":"BAMBOOLEAF TEA","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Ria Fitrasih, S.Pd., M.Pd","r2":"Dr. Nurul Fatimah, S.Pd. M.Si"},{"no":53,"ketua":"FADHANA ALDI FIRNANDI","nim":"2307010407","prodi":"Pendidikan Ekonomi (Pendidikan Administrasi Perkantoran), S1","fakultas":"FEB","judul":"Perencanaan dan Pengembangan Usaha Pudding Caramel untuk Meningkatkan Pendapatan Mahasiswa","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Ria Fitrasih, S.Pd., M.Pd","r2":"Dwi Pangesti Aprilia, S.Pd., M.Pd"},{"no":54,"ketua":"MUTHI' NUR IZZATI","nim":"2407120077","prodi":"Pendidikan Administrasi Perkantoran, S1","fakultas":"FEB","judul":"SERENITEA “Inovasi The Celup Herbal Alami dari Daun Pandan, Mint, dan Sereh Sebagai Solusi Relaksasi Anti-Insomnia”","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Yustina Dhian Novita, SH., MH","r2":"Yanesti Nuravianda Lestari, S.Gz., M.Gizi"},{"no":55,"ketua":"NAUFAL ISMAN","nim":"2306010005","prodi":"Pendidikan Jasmani, Kesehatan, dan Rekreasi, S1","fakultas":"FIK","judul":"SALYORA : INOVASI SALAD BUAH RENDAH KALORI DAN RENDAH GULA SEBAGAI SOLUSI CLEAN EATING DIET","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Dr. Nurul Fatimah, S.Pd. M.Si","r2":"Dr. sc. hum. Chatila Maharani, ST., M.Kes"},{"no":56,"ketua":"FARIDOTUL KHASANAH","nim":"2306010083","prodi":"Pendidikan Jasmani, Kesehatan, dan Rekreasi, S1","fakultas":"FIK","judul":"PENGEMBANGAN USAHA MAKANAN SEHAT BERUPA SALAD SAYUR & MINUMAN INFUSED WATER SEBAGAI GAYA HIDUP SEHAT","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Juwita Ria Rumondang, S.Pd., M.Pd.","r2":"Dr. sc. hum. Chatila Maharani, ST., M.Kes"},{"no":57,"ketua":"TEGAR SIQI PUJI PRASETYA","nim":"2306020074","prodi":"Pendidikan Jasmani Sekolah Dasar, S1","fakultas":"FIK","judul":"LEAN CHICK.ID ; PENGEMBANGAN BISNIS HEALTHY MEAL BERBASIS DADA AYAM UNTUK KOMUNITAS KEBUGARAN","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Juwita Ria Rumondang, S.Pd., M.Pd.","r2":"Devy Lestari, S.Pd., M.Pd."},{"no":58,"ketua":"LISMA HAYATI","nim":"2401050560","prodi":"Pendidikan Guru Sekolah Dasar, S1","fakultas":"FIPP","judul":"Dari Tanaman Liar ke Produk Bernilai Ekonomi Model Bisnis Inovatif Peperomia pellucida dalam Mendukung Tren Healty Lifestyle","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Devy Lestari, S.Pd., M.Pd.","r2":"Dr. Nurul Fatimah, S.Pd. M.Si"},{"no":59,"ketua":"MAERZA ALIFIAN","nim":"2306010230","prodi":"Pendidikan Jasmani, Kesehatan, dan Rekreasi, S1","fakultas":"FIK","judul":"GULUNG'O","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Yustina Dhian Novita, SH., MH","r2":"Erisa Aprilia Wicaksari, SE., MM"},{"no":60,"ketua":"TAUFIQUR ROHMAN","nim":"2306020055","prodi":"Pendidikan Jasmani Sekolah Dasar, S1","fakultas":"FIK","judul":"SALAD DADA AYAM S, DAY PERPADUAN DADA AYAM TELUR JAGUNG WORTEL KUBIS KENTANG","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Khairul Arifin, M.Pd.","r2":"Hendra Dedi Kriswanto, S.Pd., M.Pd"},{"no":61,"ketua":"RENATA IZZATI KHAIRANISYA","nim":"2306010129","prodi":"Pendidikan Jasmani, Kesehatan, dan Rekreasi, S1","fakultas":"FIK","judul":"NAFIRA FOOD SPRING ROLL","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Khairul Arifin, M.Pd.","r2":"Ria Fitrasih, S.Pd., M.Pd"},{"no":62,"ketua":"FALIH NAUFAL ARYADI","nim":"2306010108","prodi":"Pendidikan Jasmani, Kesehatan, dan Rekreasi, S1","fakultas":"FIK","judul":"Robonusa Coffee ‘’Inovasi Produk Kopi Robusta sebagai Minuman Energi Alami bagi Atlet dan Pecinta Olahraga”","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Yanesti Nuravianda Lestari, S.Gz., M.Gizi","r2":"Ria Fitrasih, S.Pd., M.Pd"},{"no":63,"ketua":"Febryan Aji Nugroho","nim":"2306010060","prodi":"Pendidikan Jasmani, Kesehatan, dan Rekreasi, S1","fakultas":"FIK","judul":"Nusantara HerbaGum: Mengubah Rempah Tradisional menjadi Modern Gummy Supplements untuk Daily Energy, Immunity Support, dan Wellness Optimal bagi Athletes, Professionals, dan Keluarga Sehat","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Yanesti Nuravianda Lestari, S.Gz., M.Gizi","r2":"Juwita Ria Rumondang, S.Pd., M.Pd."},{"no":64,"ketua":"Febryan Aji Nugroho","nim":"2306010060","prodi":"Pendidikan Jasmani, Kesehatan, dan Rekreasi, S1","fakultas":"FIK","judul":"Nusantara HerbaGum: Mengubah Rempah Tradisional menjadi Modern Gummy Supplements untuk Daily Energy, Immunity Support, dan Wellness Optimal bagi Athletes, Professionals, dan Keluarga Sehat","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Dr. sc. hum. Chatila Maharani, ST., M.Kes","r2":"Khairul Arifin, M.Pd."},{"no":65,"ketua":"IMAM TANTHOWI","nim":"2306010039","prodi":"Pendidikan Jasmani, Kesehatan, dan Rekreasi, S1","fakultas":"FIK","judul":"HiCo Fresh","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Juwita Ria Rumondang, S.Pd., M.Pd.","r2":"Yanesti Nuravianda Lestari, S.Gz., M.Gizi"},{"no":66,"ketua":"HUSNA NUR FADHILLAH","nim":"2306010019","prodi":"Pendidikan Jasmani, Kesehatan, dan Rekreasi, S1","fakultas":"FIK","judul":"Pengembangan Usaha ProSmooth : Smoothie Tinggi Protein Berbasis Buah Lokal Untuk Gaya Hidup Sehat","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Dr. sc. hum. Chatila Maharani, ST., M.Kes","r2":"Erisa Aprilia Wicaksari, SE., MM"},{"no":67,"ketua":"RAKHA AGUNG RAFIZOLA","nim":"2306010014","prodi":"Pendidikan Jasmani, Kesehatan, dan Rekreasi, S1","fakultas":"FIK","judul":"MARIN8+: Solusi Bumbu Marinasi Instan Rendah Natrium untuk Efisiensi Diet Sehat Milenial.","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Yustina Dhian Novita, SH., MH","r2":"Dr. Nurul Fatimah, S.Pd. M.Si"},{"no":68,"ketua":"AQSHA RIYANNANDA PUTRA","nim":"2306010245","prodi":"Pendidikan Jasmani, Kesehatan, dan Rekreasi, S1","fakultas":"FIK","judul":"FIT GIZI KITCHEN:Catering  Dengan Gizi Sehat Untuk Gen z Tambah Kuat, Sehat, dan Bertenaga","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Yustina Dhian Novita, SH., MH","r2":"Hendra Dedi Kriswanto, S.Pd., M.Pd"},{"no":69,"ketua":"SHELLA RAHMA KHAIRANI","nim":"2504050034","prodi":"Fisika, S1","fakultas":"FMIPA","judul":"SaguLow: Pengembangan Nasi Analog Fungsional Berbasis Pangan Lokal untuk Pasar Healthy Lifestyle","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Yanesti Nuravianda Lestari, S.Gz., M.Gizi","r2":"Khairul Arifin, M.Pd."},{"no":70,"ketua":"FERDINAND MICHAEL CALVIN SANTOSO","nim":"2402130001","prodi":"Pendidikan Seni Drama, Tari, dan Musik (Pendidikan Seni Musik), S1","fakultas":"LAINNYA","judul":"Pengembangan Pertunjukan Orkestra Kolaboratif sebagai Model Industri Kreatif Mahasiswa Berbasis SDGs 8","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Dr. sc. hum. Chatila Maharani, ST., M.Kes","r2":"Erisa Aprilia Wicaksari, SE., MM"},{"no":71,"ketua":"NABILAH SYIFA FURITA","nim":"2302130067","prodi":"Pendidikan Seni Drama, Tari, dan Musik (Pendidikan Seni Tari), S1","fakultas":"FBS","judul":"Carakaning Nata: Sanggar Seni Triwiyata Budaya","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Juwita Ria Rumondang, S.Pd., M.Pd.","r2":"Ayutisa Rizqinada, S.Pd., M.Pd"},{"no":72,"ketua":"RAHAYU WIDYA HASTUTI","nim":"2402060063","prodi":"Pendidikan Bahasa Perancis, S1","fakultas":"FBS","judul":"Batikar: Pakaian Batik Pintar Berbasis Augmented Reality pada Filter Tiktok sebagai Media Edukasi dan Pelestarian Budaya Batik di Era Digital","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Khairul Arifin, M.Pd.","r2":"Juwita Ria Rumondang, S.Pd., M.Pd."},{"no":73,"ketua":"Gina Aliyatul Jannah","nim":"2403080044","prodi":"Pendidikan Ilmu Pengetahuan Sosial, S1","fakultas":"FISIP","judul":"PITAPITU SCRAP HUMBLE: INOVASI BAG CHARM BERBASIS CIRCULAR FASHION MELALUI PEMANFAATAN TUJUH KAIN PERCA SEBAGAI UPAYA PENGURANGAN LIMBAH","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Ayutisa Rizqinada, S.Pd., M.Pd","r2":"Ria Fitrasih, S.Pd., M.Pd"},{"no":74,"ketua":"MUHAMMAD ILHAM SURYA PERMANA","nim":"2403130047","prodi":"Ilmu Komunikasi, S1","fakultas":"FISIP","judul":"Bythuseed: Inovasi Plantable Card Berbasis Kertas Daur Ulang sebagai Solusi Pengurangan Limbah Promosi dan Penguatan Ketahanan Pangan Mikro","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Erisa Aprilia Wicaksari, SE., MM","r2":"Hendra Dedi Kriswanto, S.Pd., M.Pd"},{"no":75,"ketua":"INDAH NURCHOFIFAH","nim":"2407120057","prodi":"Pendidikan Administrasi Perkantoran, S1","fakultas":"FEB","judul":"AROMA-BRIK: Inovasi Usaha briket Aromaterapi Multifungsi Berbasis Limbah Daun untuk Meningkatkan Daya Saing di Era Ekonomi Hijau","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Dr. Nurul Fatimah, S.Pd. M.Si","r2":"Yustina Dhian Novita, SH., MH"},{"no":76,"ketua":"Ria Handayani","nim":"2307010224","prodi":"Pendidikan Ekonomi (Pendidikan Administrasi Perkantoran), S1","fakultas":"FEB","judul":"Transformasi Limbah Kertas Menjadi Binder Biodegradable Berbasis  Botanical Motif Dengan Aromaterapi Sebagai Solusi Eco-Friendly  Stationary","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Ria Fitrasih, S.Pd., M.Pd","r2":"Yustina Dhian Novita, SH., MH"},{"no":77,"ketua":"RETNO AVIANTI RAHAYU","nim":"2307010299","prodi":"Pendidikan Ekonomi (Pendidikan Administrasi Perkantoran), S1","fakultas":"FEB","judul":"SEREHOMA: Lilin Aromaterapi Sereh untuk Mewujudkan Hunian Sehat Bebas Nyamuk","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Khairul Arifin, M.Pd.","r2":"Dr. Nurul Fatimah, S.Pd. M.Si"},{"no":78,"ketua":"MUHAMMAD NADIF","nim":"2408010137","prodi":"Ilmu Hukum, S1","fakultas":"FH","judul":"Naturatik : Transformasi Limbah Organik Berbasis Pangan Sebagai Pewarna Batik Alami Non-Toksik Untuk Penguatan Industri Kreatif Berkelanjutan Ekonomi Sirkular Nasional Indonesia","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Yanesti Nuravianda Lestari, S.Gz., M.Gizi","r2":"Erisa Aprilia Wicaksari, SE., MM"},{"no":79,"ketua":"DANIAR PRIANDI","nim":"2407120116","prodi":"Pendidikan Administrasi Perkantoran, S1","fakultas":"FEB","judul":"Essentials Mood Reed Diffuser","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Dr. sc. hum. Chatila Maharani, ST., M.Kes","r2":"Dwi Pangesti Aprilia, S.Pd., M.Pd"},{"no":80,"ketua":"BUNGA LARASSATI CAHYA SAPUTRI","nim":"2307010423","prodi":"Pendidikan Ekonomi (Pendidikan Administrasi Perkantoran), S1","fakultas":"FEB","judul":"TEA-CANDLE: Inovasi Lilin Aromaterapi Relaksasi Berbasis Purifikasi Minyak Jelantah dan Upcycle Limbah Ampas Teh Gerai Minuman Lokal","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Ria Fitrasih, S.Pd., M.Pd","r2":"Devy Lestari, S.Pd., M.Pd."},{"no":81,"ketua":"Cindy Nor Afita Sari","nim":"2405040040","prodi":"Pendidikan Teknik Mesin, S1","fakultas":"FT","judul":"Karya Asta Nawasena Vastra Kala : Inovasi Upcycling Fashion Berbasis Budaya Nusantara sebagai Solusi Pengurangan Limbah Tekstil","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Ria Fitrasih, S.Pd., M.Pd","r2":"Yustina Dhian Novita, SH., MH"},{"no":82,"ketua":"NAYLA SYAYIDINA AZAHRA","nim":"2404060036","prodi":"Pendidikan Kimia, S1","fakultas":"FMIPA","judul":"SERENITY ECO-COASTER: INOVASI TATAKAN MINUM RAMAH LINGKUNGAN BERAROMA LEMONGRASS DARI LIMBAH AMPAS TEH SEBAGAI PRODUK SOUVENIR BERNILAI EKONOMIS","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Yustina Dhian Novita, SH., MH","r2":"Hendra Dedi Kriswanto, S.Pd., M.Pd"},{"no":83,"ketua":"Chaterine Dyah Ramadhani","nim":"2402140058","prodi":"Pendidikan Bahasa dan Sastra Jawa, S1","fakultas":"FBS","judul":"Glitch-Key: Solusi Eco-Creative Terintegrasi dalam Penanganan Sampah Plastik Berbasis Budaya Populer","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Yanesti Nuravianda Lestari, S.Gz., M.Gizi","r2":"Ayutisa Rizqinada, S.Pd., M.Pd"},{"no":84,"ketua":"PUTRI ALYA ANINDITHA","nim":"2307010410","prodi":"Pendidikan Ekonomi (Pendidikan Administrasi Perkantoran), S1","fakultas":"FEB","judul":"Pengembangan Usaha EduSnack : inovasi Camilan Sehat Homemade Bagi Mahasiwa Berbasis Literasi Keuangan.","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Ayutisa Rizqinada, S.Pd., M.Pd","r2":"Hendra Dedi Kriswanto, S.Pd., M.Pd"},{"no":85,"ketua":"ZALFA ALYA SALSABILA","nim":"2201421057","prodi":"Pendidikan Bahasa Inggris, S1","fakultas":"FBS","judul":"La’ Gombals: Innovation in Eco-Friendly Bricks from Textile Waste for Sustainable Living with Acoustic and Aesthetic Properties","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Khairul Arifin, M.Pd.","r2":"Ayutisa Rizqinada, S.Pd., M.Pd"},{"no":86,"ketua":"FIKI ZIADATU RAHMAH","nim":"2402140071","prodi":"Pendidikan Bahasa dan Sastra Jawa, S1","fakultas":"FBS","judul":"KeyCharm: Usaha Gantungan Kunci KinaCharm Sebagai Peluang Wirausaha Bagi Mahasiswa","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Juwita Ria Rumondang, S.Pd., M.Pd.","r2":"Devy Lestari, S.Pd., M.Pd."},{"no":87,"ketua":"ADZRA PUTRI MAYYASAH","nim":"2407120064","prodi":"Pendidikan Administrasi Perkantoran, S1","fakultas":"FEB","judul":"inovasi piring sekali pakai berbahan dasar daun jati yang ramah lingkungan dan dapat terurai menjadi pupuk, sebagai solusi pengurangan sampah plastik","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Hendra Dedi Kriswanto, S.Pd., M.Pd","r2":"Dwi Pangesti Aprilia, S.Pd., M.Pd"},{"no":88,"ketua":"ANGGITA CAHYANI","nim":"2407120115","prodi":"Pendidikan Administrasi Perkantoran, S1","fakultas":"FEB","judul":"Inovasi Lilin Aromaterapi Berbasis Activated Charcoal dan Essential Oil sebagai Solusi Pengurang Bau serta Kelembapan pada Ruangan Hunian Mahasiswa","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Dr. sc. hum. Chatila Maharani, ST., M.Kes","r2":"Khairul Arifin, M.Pd."},{"no":89,"ketua":"EKY ERYDA INVIANA","nim":"2407120072","prodi":"Pendidikan Administrasi Perkantoran, S1","fakultas":"FEB","judul":"PEELORA: Bioplastik Inovatif Berbasis Limbah Kulit Jeruk Bali dan Pisang Kepok Untuk Produksi Tas Eco-Fashion","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Khairul Arifin, M.Pd.","r2":"Ayutisa Rizqinada, S.Pd., M.Pd"},{"no":90,"ketua":"Elza Natasya Gunawan","nim":"2404040062","prodi":"Pendidikan Fisika, S1","fakultas":"FMIPA","judul":"Remere : Kerajinan Resin Menggunakan Limbah Skincare Berbahan Dasar Kaca","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Khairul Arifin, M.Pd.","r2":"Yustina Dhian Novita, SH., MH"},{"no":91,"ketua":"DLIYA LAELA EKA MEVIANA","nim":"2309020005","prodi":"Kesehatan Masyarakat (Epidemiologi), S1","fakultas":"FK","judul":"Kiddybooks: Inovasi Buku Interaktif Berbasis Storytelling sebagai Literasi Risiko Kesehatan untuk Anak","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Ria Fitrasih, S.Pd., M.Pd","r2":"Yustina Dhian Novita, SH., MH"},{"no":92,"ketua":"Gregorius Pasca Laksono","nim":"2302090001","prodi":"Pendidikan Bahasa Mandarin, S1","fakultas":"FBS","judul":"QIANXIU HANFU GALLERY","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Yustina Dhian Novita, SH., MH","r2":"Dr. sc. hum. Chatila Maharani, ST., M.Kes"},{"no":93,"ketua":"TITHANIA PUTRI TRISNAWATI","nim":"2408010607","prodi":"Ilmu Hukum, S1","fakultas":"FH","judul":"SINASARA: AKSARA SHAPE SORTER SEBAGAI MEDIA STIMULASI KOGNITIF RAMAH TUNANETRA BERBAHAN LIMBAH KAYU DAN KONVEKSI DALAM UPAYA PERWUJUDAN SDG'S 4","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Ria Fitrasih, S.Pd., M.Pd","r2":"Dr. Nurul Fatimah, S.Pd. M.Si"},{"no":94,"ketua":"DEDE KHOTIMATUL AULAD","nim":"2404130084","prodi":"Teknik Informatika, S1","fakultas":"FT","judul":"Dbooth.photo","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Yustina Dhian Novita, SH., MH","r2":"Dr. sc. hum. Chatila Maharani, ST., M.Kes"},{"no":95,"ketua":"AIMMATUL UMMI KUSUMA","nim":"2403130058","prodi":"Ilmu Komunikasi, S1","fakultas":"FISIP","judul":"NetSlicer: Studio Edukasi Digital yang “Potong Habis” Hoaks dan Misinfo","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Ayutisa Rizqinada, S.Pd., M.Pd","r2":"Dwi Pangesti Aprilia, S.Pd., M.Pd"},{"no":96,"ketua":"Zulfikar Mustaqim Akbar","nim":"2306010012","prodi":"Pendidikan Jasmani, Kesehatan, dan Rekreasi, S1","fakultas":"FIK","judul":"MFD - MULTILATERAL FOOTBALL DEVELOPMENT","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Yustina Dhian Novita, SH., MH","r2":"Dwi Pangesti Aprilia, S.Pd., M.Pd"},{"no":97,"ketua":"AISYAH YOJA KINANTI","nim":"2306020018","prodi":"Pendidikan Jasmani Sekolah Dasar, S1","fakultas":"FIK","judul":"JTC Swimming","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Dr. Nurul Fatimah, S.Pd. M.Si","r2":"Juwita Ria Rumondang, S.Pd., M.Pd."},{"no":98,"ketua":"ALTHEA SYAHRIZA SEPTIRIANA","nim":"2306010029","prodi":"Pendidikan Jasmani, Kesehatan, dan Rekreasi, S1","fakultas":"FIK","judul":"“LA-PRIDE: INOVASI BINGKAI MEDALI BERBASIS VISUALISASI RUTE DAN  DATA PERSONAL RECORD DENGAN STRING ART”","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Yanesti Nuravianda Lestari, S.Gz., M.Gizi","r2":"Devy Lestari, S.Pd., M.Pd."},{"no":99,"ketua":"RESTIKA ARI FATMAWATI","nim":"2306010148","prodi":"Pendidikan Jasmani, Kesehatan, dan Rekreasi, S1","fakultas":"FIK","judul":"TIWARA RECOVERY: JASA MASSAGE PANGGILAN YANG MELAYANI TERAPI CEDERA DAN KEBUGARAN YANG DIPADUKAN DENGAN HYDROTERAPI","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Erisa Aprilia Wicaksari, SE., MM","r2":"Yustina Dhian Novita, SH., MH"},{"no":100,"ketua":"SULIS NUR MASRUROH","nim":"2401030046","prodi":"Pendidikan Non Formal, S1","fakultas":"FIPP","judul":"EDUHOME: KONSULTAN HOMESCHOOLING PROFESIONAL","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Yustina Dhian Novita, SH., MH","r2":"Dwi Pangesti Aprilia, S.Pd., M.Pd"},{"no":101,"ketua":"AFIF MARCELINO","nim":"2306020008","prodi":"Pendidikan Jasmani Sekolah Dasar, S1","fakultas":"FIK","judul":"Wings.shoess : jasa cuci sepatu dan sandal antar jemput","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Dwi Pangesti Aprilia, S.Pd., M.Pd","r2":"Yanesti Nuravianda Lestari, S.Gz., M.Gizi"},{"no":102,"ketua":"Dani Fikri Fauzi","nim":"2306010041","prodi":"Pendidikan Jasmani, Kesehatan, dan Rekreasi, S1","fakultas":"FIK","judul":"DESRIS MASSAGE TRAINING: KEPELATIHAN MASSAGE CEDERA OLAHRAGA DAN MASSAGE KEBUGARAN","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Khairul Arifin, M.Pd.","r2":"Devy Lestari, S.Pd., M.Pd."},{"no":103,"ketua":"MELINA FEBRIYANTI PUTRI","nim":"2306020081","prodi":"Pendidikan Jasmani Sekolah Dasar, S1","fakultas":"FIK","judul":"AQUASTART SWIM CLASS: LAYANAN PELATIHAN RENANG PEMULA BERBASIS FUN LEARNING DAN WATER SAFETY UNTUK ANAK USIA DINI","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Hendra Dedi Kriswanto, S.Pd., M.Pd","r2":"Dr. sc. hum. Chatila Maharani, ST., M.Kes"},{"no":104,"ketua":"EVAN RAMANDANI","nim":"2306020071","prodi":"Pendidikan Jasmani Sekolah Dasar, S1","fakultas":"FIK","judul":"SPORTIFY:Rental Alat Olahraga Mahasiswa untuk Gaya Hidup Sehat dan Hits","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Yustina Dhian Novita, SH., MH","r2":"Dwi Pangesti Aprilia, S.Pd., M.Pd"},{"no":105,"ketua":"RAFIF ALWY WIDIANTO","nim":"2306020070","prodi":"Pendidikan Jasmani Sekolah Dasar, S1","fakultas":"FIK","judul":"STEPSECOND.ID : PERENCANAAN BISNIS PENJUALAN SEPATU SECOND ORIGINAL SEBAGAI PELUANG USAHA DI ERA DIGITAL","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Dr. sc. hum. Chatila Maharani, ST., M.Kes","r2":"Dwi Pangesti Aprilia, S.Pd., M.Pd"},{"no":106,"ketua":"KUSUMA ADIARSA","nim":"2306020064","prodi":"Pendidikan Jasmani Sekolah Dasar, S1","fakultas":"FIK","judul":"PENGEMBANGAN USAHA KERIPIK SINGKONG \"BARIKLANA SNACK\": INOVASI RASA LOKAL BERNILAI EKSPOR UNTUK PASAR MAKANAN RINGAN SEHAT","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Hendra Dedi Kriswanto, S.Pd., M.Pd","r2":"Khairul Arifin, M.Pd."},{"no":107,"ketua":"AHMAD RIDHO PAMBUDI","nim":"2306020093","prodi":"Pendidikan Jasmani Sekolah Dasar, S1","fakultas":"FIK","judul":"PERENCANAAN BISNIS TOKO PERALATAN OLAHRAGA MURAH DAN BERKUALITAS UNTUK SEGMEN PELAJAR DAN UMUM","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Yanesti Nuravianda Lestari, S.Gz., M.Gizi","r2":"Hendra Dedi Kriswanto, S.Pd., M.Pd"},{"no":108,"ketua":"Muhammad Farhan Surya Nugraha","nim":"2306010120","prodi":"Pendidikan Jasmani, Kesehatan, dan Rekreasi, S1","fakultas":"FIK","judul":"Sport Development Agency Berbasis Sport Science yang Berfokus pada Pengembangan Atlet Melalui Performance Analysis, Strength and Conditioning, Sport Nutrition, serta Media Branding","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Dwi Pangesti Aprilia, S.Pd., M.Pd","r2":"Khairul Arifin, M.Pd."},{"no":109,"ketua":"ANANDA SURYA RAMADHAN","nim":"2306020087","prodi":"Pendidikan Jasmani Sekolah Dasar, S1","fakultas":"FIK","judul":"SHOECLEAN: JASA LAUNDRY SEPATU PROFESIONAL","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Hendra Dedi Kriswanto, S.Pd., M.Pd","r2":"Devy Lestari, S.Pd., M.Pd."},{"no":110,"ketua":"Afanin Hasna Salsabila","nim":"2306010079","prodi":"Pendidikan Jasmani, Kesehatan, dan Rekreasi, S1","fakultas":"FIK","judul":"LSPR (Les Renang Perfect RAWR) : Pengembangan Klub Renang Profesional untuk Semua Usia di Semarang","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Khairul Arifin, M.Pd.","r2":"Yustina Dhian Novita, SH., MH"},{"no":111,"ketua":"EKO SUSILO","nim":"2306020054","prodi":"Pendidikan Jasmani Sekolah Dasar, S1","fakultas":"FIK","judul":"WIRAUSAHA PUPUK KASCING","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Dwi Pangesti Aprilia, S.Pd., M.Pd","r2":"Dr. Nurul Fatimah, S.Pd. M.Si"},{"no":112,"ketua":"RAFIQURAHMAN WAKHID SAPUTRA","nim":"2306010213","prodi":"Pendidikan Jasmani, Kesehatan, dan Rekreasi, S1","fakultas":"FIK","judul":"HYDROSWIM: SOLUSI EDUKASI RENANG DAN TERAPI AIR UNTUK KESEHATAN MASYARAKAT","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Yanesti Nuravianda Lestari, S.Gz., M.Gizi","r2":"Erisa Aprilia Wicaksari, SE., MM"},{"no":113,"ketua":"MIA AURA SALSABILA","nim":"2504080065","prodi":"Kimia, S1","fakultas":"FMIPA","judul":"EcoFresh Coat: Inovasi Edible Coating Alami untuk Mengurangi Food Loss Buah Klimakterik pada Rantai Distribusi dan Rumah Tangga","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Dwi Pangesti Aprilia, S.Pd., M.Pd","r2":"Yustina Dhian Novita, SH., MH"},{"no":114,"ketua":"Amelia Rindang Prameswari","nim":"2409030036","prodi":"Gizi, S1","fakultas":"FK","judul":"La Catesé: Larvasida Alami Berbasis Ekstrak Daun Pepaya sebagai Solusi Berkelanjutan untuk Pencegahan Demam Berdarah Dengue (DBD)","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Ria Fitrasih, S.Pd., M.Pd","r2":"Ayutisa Rizqinada, S.Pd., M.Pd"},{"no":115,"ketua":"AINA SAPNA RAHIMA","nim":"2407120033","prodi":"Pendidikan Administrasi Perkantoran, S1","fakultas":"FEB","judul":"CHERAVERA SOAP: Inovasi Sabun Herbal Lidah Buaya dan Daun Kersen Untuk Melembabkan Dan Menutrisi Kulit","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Dwi Pangesti Aprilia, S.Pd., M.Pd","r2":"Ayutisa Rizqinada, S.Pd., M.Pd"},{"no":116,"ketua":"NAZWA KAILA ANINDIA","nim":"2307010178","prodi":"Pendidikan Ekonomi (Pendidikan Administrasi Perkantoran), S1","fakultas":"FEB","judul":"OranDry: Inovasi Produk Dehumidifier Alami Berbasis Limbah Kulit Jeruk sebagai Solusi Ruangan Anti Lembap dan Ramah Lingkungan","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Juwita Ria Rumondang, S.Pd., M.Pd.","r2":"Dwi Pangesti Aprilia, S.Pd., M.Pd"},{"no":117,"ketua":"MOCHAMMAD HASDAN AUFAL","nim":"2407010083","prodi":"Pendidikan Ekonomi, S1","fakultas":"FEB","judul":"ReChar : PENGEMBANGAN BIOCHAR AKTIF BERBASIS LIMBAH SAYURAN UNTUK MENDORONG PRAKTIK PERTANIAN RAMAH LINGKUNGAN DAN EKONOMI SIRKULAR","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Khairul Arifin, M.Pd.","r2":"Yanesti Nuravianda Lestari, S.Gz., M.Gizi"},{"no":118,"ketua":"DESVITA SEKAR PUTRI KIRANI","nim":"2307010187","prodi":"Pendidikan Ekonomi (Pendidikan Administrasi Perkantoran), S1","fakultas":"FEB","judul":"Pengembangan Eco-Enzyme Cleaner Berbasis Limbah Organik Lokal dengan Sistem Refill Berkelanjutan","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Yanesti Nuravianda Lestari, S.Gz., M.Gizi","r2":"Juwita Ria Rumondang, S.Pd., M.Pd."},{"no":119,"ketua":"VIKA RISKY RAHMAWATI","nim":"2401020017","prodi":"Teknologi Pendidikan, S1","fakultas":"FIPP","judul":"KARSA (Inovasi Laundry Booster Berbasis Bio-Enzim Eceng Gondok dan Essential Oil Cengkeh sebagai Solusi Perawatan Pakaian Ramah Lingkungan)","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Ayutisa Rizqinada, S.Pd., M.Pd","r2":"Erisa Aprilia Wicaksari, SE., MM"},{"no":120,"ketua":"BINTANG ADI NUGRAHA","nim":"2407030441","prodi":"Manajemen, S1","fakultas":"FEB","judul":"ATAPTIK: Inovasi Genteng Komposit Berbasis Limbah HDPE dan Biomassa Sekam Padi sebagai Alternatif Material Rendah Karbon pada Sektor Manufaktur Konstruksi dalam Mendukung Transformasi Industri Konstru","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Juwita Ria Rumondang, S.Pd., M.Pd.","r2":"Ayutisa Rizqinada, S.Pd., M.Pd"},{"no":121,"ketua":"MUHAMAD IKBAL MAULANA","nim":"2305080002","prodi":"Pendidikan Teknik Elektro, S1","fakultas":"FT","judul":"MeatGuard: Inovasi Alat Pendeteksi Kebusukan Daging Berbasis IoT sebagai Solusi  Keamanan Pangan UMKM","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Hendra Dedi Kriswanto, S.Pd., M.Pd","r2":"Khairul Arifin, M.Pd."},{"no":122,"ketua":"AMELIA KHOIRUNNITA","nim":"2504080006","prodi":"Kimia, S1","fakultas":"FMIPA","judul":"ECOCOCO: INOVASI EDIBLE SPOON TINGGI SERAT DARI LIMBAH AMPAS KELAPA SEBAGAI SOLUSI ALAT MAKAN ZERO WASTE","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Hendra Dedi Kriswanto, S.Pd., M.Pd","r2":"Ayutisa Rizqinada, S.Pd., M.Pd"},{"no":123,"ketua":"MOHAMMAD NURDIN ALI SAID","nim":"2306010111","prodi":"Pendidikan Jasmani, Kesehatan, dan Rekreasi, S1","fakultas":"FIK","judul":"Herbal Active Soap: Inovasi Sabun Kesehatan Berbasis Temulawak dan Binahong untuk Pencegahan Infeksi Kulit pada Aktivitas Olahraga Intensif","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Devy Lestari, S.Pd., M.Pd.","r2":"Khairul Arifin, M.Pd."},{"no":124,"ketua":"ZADIRA KEIZA ALYKHA SIDIK","nim":"2407030132","prodi":"Manajemen, S1","fakultas":"FEB","judul":"SIPADI: Sistem Monitoring Irigasi Air dan Hama Terjangkau Berbasis Sensor Ultrasonik Waterproof JSN-SR04T dan Sensor PIR Melalui SMS sebagai Optimalisasi Metode AWD pada Lahan Pertanian Padi","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Dwi Pangesti Aprilia, S.Pd., M.Pd","r2":"Yanesti Nuravianda Lestari, S.Gz., M.Gizi"},{"no":125,"ketua":"SANIA ZAHARA SALSABILA","nim":"2307010068","prodi":"Pendidikan Ekonomi (Pendidikan Administrasi Perkantoran), S1","fakultas":"FEB","judul":"Inovasi Produk Lilin Aromaterapi Berbasis Minyak Atsiri Alami Serai dan Kayu Putih sebagai Peluang Usaha E-Commerce Ramah Lingkungan","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Dwi Pangesti Aprilia, S.Pd., M.Pd","r2":"Yustina Dhian Novita, SH., MH"},{"no":126,"ketua":"SHAFIRA KAMILA PUTRI","nim":"2404060035","prodi":"Pendidikan Kimia, S1","fakultas":"FMIPA","judul":"SMART AI WATER PURIFICATION LEARNING SYSTEM SEBAGAI MEDIA PEMBELAJARAN INTERAKTIF BERBASIS AI DAN IOT UNTUK MENINGKATKAN LITERASI SAINS","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Erisa Aprilia Wicaksari, SE., MM","r2":"Ria Fitrasih, S.Pd., M.Pd"},{"no":127,"ketua":"NESYA ARSITA DEWI","nim":"2307010389","prodi":"Pendidikan Ekonomi (Pendidikan Administrasi Perkantoran), S1","fakultas":"FEB","judul":"Resikra: Produk Pembersih Lantai Berbasis Ecoenzym sebagai Upaya Pemanfaatan Limbah Organik yang Ramah Lingkungan dengan Karakteristik Formulasi yang Minim Risiko Terhadap Gangguan Dermatologis","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Juwita Ria Rumondang, S.Pd., M.Pd.","r2":"Ria Fitrasih, S.Pd., M.Pd"},{"no":128,"ketua":"BAGAS PERMANA","nim":"2407020366","prodi":"Akuntansi, S1","fakultas":"FEB","judul":"VERSASIRSA: Formulasi Spray Oral Berbasis Ekstrak Daun Sirsak (Annona muricata L.) sebagai Agen Antibakteri Penyebab Bau Mulut","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Dr. Nurul Fatimah, S.Pd. M.Si","r2":"Ayutisa Rizqinada, S.Pd., M.Pd"},{"no":129,"ketua":"DHAFINA MILDA AULIA","nim":"2307010290","prodi":"Pendidikan Ekonomi (Pendidikan Administrasi Perkantoran), S1","fakultas":"FEB","judul":"Inovasi Sedotan Biodegradeble Berbasis Biji Durian sebagai Solusi Substitusi Plastik Sekali Pakai","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Dwi Pangesti Aprilia, S.Pd., M.Pd","r2":"Khairul Arifin, M.Pd."},{"no":130,"ketua":"OKTA SUNGKONO","nim":"2307010393","prodi":"Pendidikan Ekonomi (Pendidikan Administrasi Perkantoran), S1","fakultas":"FEB","judul":"REJELIN: Inovasi Lilin Aromaterapi Ramah Lingkungan Berbasis Daur Ulang Minyak Jelantah sebagai Upaya Pengurangan Limbah Rumah Tangga.","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Ayutisa Rizqinada, S.Pd., M.Pd","r2":"Yustina Dhian Novita, SH., MH"},{"no":131,"ketua":"PUTRI YURDA NINGSIH","nim":"2407120032","prodi":"Pendidikan Administrasi Perkantoran, S1","fakultas":"FEB","judul":"SEKAYU-SAI ( serbuk kayu,  serai, dan jeruk) :  pemanfaatan limbah kayu menjadi obat nyamuk estetik dan relaksasi bagi masyarakat urban & rural","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Khairul Arifin, M.Pd.","r2":"Hendra Dedi Kriswanto, S.Pd., M.Pd"},{"no":132,"ketua":"Shinta Agustyaningsih","nim":"2407040096","prodi":"Ekonomi Pembangunan, S1","fakultas":"FEB","judul":"Waste Point: Pengelolaan Sampah Jenis Plastik dan Kertas Melalui Sistem Poin serta Pemberdayaan UMKM Daur Ulang Berbasis Sistem Digital","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Yanesti Nuravianda Lestari, S.Gz., M.Gizi","r2":"Yustina Dhian Novita, SH., MH"},{"no":133,"ketua":"FREDENSYAH","nim":"2407120044","prodi":"Pendidikan Administrasi Perkantoran, S1","fakultas":"FEB","judul":"SELAINA: INOVASI SELAI BUAH NAGA SEBAGAI PRODUK OLAHAN BERNILAI TAMBAH BERBASIS POTENSI LOKAL","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Hendra Dedi Kriswanto, S.Pd., M.Pd","r2":"Khairul Arifin, M.Pd."},{"no":134,"ketua":"ALYA VEKA AZZAHRA","nim":"2407120020","prodi":"Pendidikan Administrasi Perkantoran, S1","fakultas":"FEB","judul":"ResQFood: Website Digital Food Rescue sebagai Solusi Cerdas Pengelolaan  Makanan Surplus di Era Transformasi Teknologi","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Dwi Pangesti Aprilia, S.Pd., M.Pd","r2":"Ria Fitrasih, S.Pd., M.Pd"},{"no":135,"ketua":"NURUL ANAM","nim":"2407020033","prodi":"Akuntansi, S1","fakultas":"FEB","judul":"Trash Ranger: Solusi Inovatif Pengelolaan Sampah Anorganik di Era Digital dengan Layanan Terintegrasi Berbasis Sistem Distribusi, Marketplace, dan Edukasi demi Mewujudkan Ekonomi Sirkular Berkelanjuta","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Juwita Ria Rumondang, S.Pd., M.Pd.","r2":"Ayutisa Rizqinada, S.Pd., M.Pd"},{"no":136,"ketua":"LINTANG AJI PURNOMO","nim":"2401030089","prodi":"Pendidikan Non Formal, S1","fakultas":"FIPP","judul":"EcoRT (Ecosystem RT) Berbasis Smart Waste Management System Solusi  Pengelolaan Sampah & Administrasi RT","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Yustina Dhian Novita, SH., MH","r2":"Devy Lestari, S.Pd., M.Pd."},{"no":137,"ketua":"NAZILLA DWI HAPSARI","nim":"2407120084","prodi":"Pendidikan Administrasi Perkantoran, S1","fakultas":"FEB","judul":"Website Pemantau Sampah Digital Berbasis Komunitas","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Juwita Ria Rumondang, S.Pd., M.Pd.","r2":"Hendra Dedi Kriswanto, S.Pd., M.Pd"},{"no":138,"ketua":"RIZA AHMAD WIJAYA","nim":"2306020010","prodi":"Pendidikan Jasmani Sekolah Dasar, S1","fakultas":"FIK","judul":"Lapak Olahraga id: Upaya Digitalisasi Layanan Penyewaan Lapangan Olahraga di Kota Semarang","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Ria Fitrasih, S.Pd., M.Pd","r2":"Juwita Ria Rumondang, S.Pd., M.Pd."},{"no":139,"ketua":"NABILA IMTINAM AFIAH","nim":"2407120010","prodi":"Pendidikan Administrasi Perkantoran, S1","fakultas":"FEB","judul":"INOVASI PELET PAKAN AYAM PETELUR BERNILAI TAMBAH BERBASIS SPIRULINA DAN UBI JALAR UNTUK MENINGKATKAN KUALITAS TELUR","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Hendra Dedi Kriswanto, S.Pd., M.Pd","r2":"Juwita Ria Rumondang, S.Pd., M.Pd."},{"no":140,"ketua":"IBNU ALKA SEFRIANSYAH","nim":"2407120112","prodi":"Pendidikan Administrasi Perkantoran, S1","fakultas":"FEB","judul":"Inovasi Tinta Pena Ramah Lingkungan Berbasis Limbah Kulit Manggis","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Dr. Nurul Fatimah, S.Pd. M.Si","r2":"Ayutisa Rizqinada, S.Pd., M.Pd"},{"no":141,"ketua":"Albertus Haryo Saktiawan","nim":"2408010301","prodi":"Ilmu Hukum, S1","fakultas":"FH","judul":"INFERBIKAN : PUPUK CAIR FERMENTASI BERBAHAN DAUN PEPAYA DAN KENCUR SEBAGAI UPAYA PENINGKATAN PERTUMBUHAN DAN IMUNITAS IKAN BUDIDAYA","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Dr. Nurul Fatimah, S.Pd. M.Si","r2":"Juwita Ria Rumondang, S.Pd., M.Pd."},{"no":142,"ketua":"Mohammad Haikal Baihaqi Al Islami","nim":"2407030011","prodi":"Manajemen, S1","fakultas":"FEB","judul":"SAPTANI: Inovasi BIO-ZPT Kaya Auksin dan Giberelin Berbasis Telur Keong Mas  (Pomacea canaliculata) Sebagai Solusi Pertanian Berkelanjutan","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Yustina Dhian Novita, SH., MH","r2":"Ayutisa Rizqinada, S.Pd., M.Pd"},{"no":143,"ketua":"NABILA BERLIANI SEPTIA RAHMA PUTRI","nim":"2404090053","prodi":"Pendidikan Biologi, S1","fakultas":"FMIPA","judul":"BIOFEED-MBG: Optimalisasi Biotransformasi Limbah MBG sebagai Sumber Nutrien Alternatif Pakan Ayam Petelur untuk Efisiensi dan Produktivitas","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Ria Fitrasih, S.Pd., M.Pd","r2":"Dwi Pangesti Aprilia, S.Pd., M.Pd"},{"no":144,"ketua":"BILAL PERWIRA","nim":"2306010211","prodi":"Pendidikan Jasmani, Kesehatan, dan Rekreasi, S1","fakultas":"FIK","judul":"GIZIGO: PENGEMBANGAN USAHA MAKANAN SEHAT BERGIZI PRAKTIS BERBASIS KEBUTUHAN KALORI HARIAN","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Dr. Nurul Fatimah, S.Pd. M.Si","r2":"Dwi Pangesti Aprilia, S.Pd., M.Pd"},{"no":145,"ketua":"MILDA AYU AKMILA","nim":"2403080009","prodi":"Pendidikan Ilmu Pengetahuan Sosial, S1","fakultas":"FISIP","judul":"BroBat (Brownies Batik Nusantara)","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Hendra Dedi Kriswanto, S.Pd., M.Pd","r2":"Dr. sc. hum. Chatila Maharani, ST., M.Kes"},{"no":146,"ketua":"NOVI YULIANTI","nim":"4201422003","prodi":"Pendidikan Fisika, S1","fakultas":"FMIPA","judul":"ECOJEL Fusion Series: Diversifikasi Produk Jelly Gummy Multirasa Berbasis Limbah Albedo Semangka dengan Smart Food Biodegradable Packaging untuk Mendukung Green Entrepreneurship","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Yustina Dhian Novita, SH., MH","r2":"Hendra Dedi Kriswanto, S.Pd., M.Pd"},{"no":147,"ketua":"AHMAD NAUFAL AMMAR ABDULLAH","nim":"2307010069","prodi":"Pendidikan Ekonomi (Pendidikan Administrasi Perkantoran), S1","fakultas":"FEB","judul":"Kubielicious: Inovasi Cookies Berbahan Dasar Ubi Lokal sebagai Produk Camilan Sehat, Kreatif, dan Bernilai Ekonomi Tinggi","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Devy Lestari, S.Pd., M.Pd.","r2":"Hendra Dedi Kriswanto, S.Pd., M.Pd"},{"no":148,"ketua":"Muhammad Sa'daika Quthbi Mudhofar","nim":"2402140011","prodi":"Pendidikan Bahasa dan Sastra Jawa, S1","fakultas":"FBS","judul":"INOVASI KARTU PERMAINAN EDUKATIF  BAHASA JAWAUNTUK SD/MI “SEBERAPA JAWA KAMU”","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Hendra Dedi Kriswanto, S.Pd., M.Pd","r2":"Yustina Dhian Novita, SH., MH"},{"no":149,"ketua":"LAELA RIZKITA HANI","nim":"2307010415","prodi":"Pendidikan Ekonomi (Pendidikan Administrasi Perkantoran), S1","fakultas":"FEB","judul":"\"SEED-CUP: Inovasi Wadah Sambal Biodegradable Berbasis Edible-Cracker dengan Integrasi Benih Hortikultura sebagai Solusi Zero-Waste Kuliner Mahasiswa","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Yustina Dhian Novita, SH., MH","r2":"Yanesti Nuravianda Lestari, S.Gz., M.Gizi"},{"no":150,"ketua":"TUHFATUL MUMTAZ NABIHAH","nim":"2307010045","prodi":"Pendidikan Ekonomi (Pendidikan Administrasi Perkantoran), S1","fakultas":"FEB","judul":"GREEN WELLNESS CANDLE: INOVASI PENGOLAHAN MINYAK JELANTAH MENJADI LILIN AROMATERAPI KESEHATAN SEBAGAI MEDIA RELAKSASI DAN ANTI-STRES SERTA SOLUSI PENGELOLAAN LIMBAH DAN PELUANG USAHA BERKELANJUTAN BAG","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Ria Fitrasih, S.Pd., M.Pd","r2":"Hendra Dedi Kriswanto, S.Pd., M.Pd"},{"no":151,"ketua":"Nuansa Sydni Arfavenusa","nim":"2403070032","prodi":"Pendidikan Sosiologi dan Antropologi, S1","fakultas":"FISIP","judul":"VENUANCE: INOVASI TEKNOLOGI TEKSTIL ANTI-UV DAN MOTIF BATIK DALAM DESAIN KEMEJA UNTUK PERLINDUNGAN KESEHATAN DAN PELESTARIAN BUDAYA LOKAL","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Yustina Dhian Novita, SH., MH","r2":"Khairul Arifin, M.Pd."},{"no":152,"ketua":"FARIDA MELINA SARI","nim":"2402110036","prodi":"Pendidikan Seni Rupa, S1","fakultas":"FBS","judul":"SAKASISA: PEMANFAATAN LIMBAH ORGANIK AGROINDUSTRI SEBAGAI MATERIAL ECO-CLAY TERINTEGRASI TEKNOLOGI NEAR FIELD COMMUNICATION (NFC) DALAM MENDUKUNG ECOTOURISM BERBASIS INDUSTRI KREATIF","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Dr. Nurul Fatimah, S.Pd. M.Si","r2":"Khairul Arifin, M.Pd."},{"no":153,"ketua":"MELSALINDA RIZKI AMALIA","nim":"2306010042","prodi":"Pendidikan Jasmani, Kesehatan, dan Rekreasi, S1","fakultas":"FIK","judul":"Troso Beauty Pouch : Inovasi dan Pengembangan Pouch Makeup Etnik Modern Berbasis Kain Troso sebagai Upaya Pelestarian Kearifan Lokal untuk Perempuan Aktif","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Dr. sc. hum. Chatila Maharani, ST., M.Kes","r2":"Khairul Arifin, M.Pd."},{"no":154,"ketua":"Pithaloka Indraswari","nim":"2405070032","prodi":"Teknik Kimia, S1","fakultas":"FT","judul":"JariCeria: Main Sambil Belajar dengan Finger Paint Edible dari Ampas Kedelai","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Yanesti Nuravianda Lestari, S.Gz., M.Gizi","r2":"Dwi Pangesti Aprilia, S.Pd., M.Pd"},{"no":155,"ketua":"Malova Revalina Prihardevi","nim":"2309020031","prodi":"Kesehatan Masyarakat (Administrasi Kebijakan Kesehatan), S1","fakultas":"FK","judul":"AEROFRIES: Pengembangan Snack Kentang Rendah Lemak Berbasis Inovasi Proses untuk  Mendukung Gaya Hidup Sehat dan Berkelanjutan","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Juwita Ria Rumondang, S.Pd., M.Pd.","r2":"Khairul Arifin, M.Pd."},{"no":156,"ketua":"MUTHI' NUR IZZATI","nim":"2407120077","prodi":"Pendidikan Administrasi Perkantoran, S1","fakultas":"FEB","judul":"SERENITEA “ Inovasi The Celup Herbal Alami dari Daun Pandan, Mint, dan Sereh Sebagai Solusi Relaksasi Anti-Insomnia”","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Dr. sc. hum. Chatila Maharani, ST., M.Kes","r2":"Dwi Pangesti Aprilia, S.Pd., M.Pd"},{"no":157,"ketua":"STIFANI APRILIA","nim":"2305070034","prodi":"Teknik Kimia, S1","fakultas":"FT","judul":"Savera: Foot spray Organik dari Paduan Ekstrak Daun Kecombrang dan Aloe Vera","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Dr. sc. hum. Chatila Maharani, ST., M.Kes","r2":"Yanesti Nuravianda Lestari, S.Gz., M.Gizi"},{"no":158,"ketua":"ATADA FAREL LUKMANA","nim":"2306020001","prodi":"Pendidikan Jasmani Sekolah Dasar, S1","fakultas":"FIK","judul":"Bengkel Sepeda Motor","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Hendra Dedi Kriswanto, S.Pd., M.Pd","r2":"Dr. sc. hum. Chatila Maharani, ST., M.Kes"},{"no":159,"ketua":"ZIRYU ROBBEN DUTA WIJAYA","nim":"2403070063","prodi":"Pendidikan Sosiologi dan Antropologi, S1","fakultas":"FISIP","judul":"Inovasi Smart Emotional Clothing Berbasis Digital Experience bagi Generasi Muda","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Khairul Arifin, M.Pd.","r2":"Ayutisa Rizqinada, S.Pd., M.Pd"},{"no":160,"ketua":"MUHAMMAD FATIH RAKHA ZHAFRAN","nim":"2306010033","prodi":"Pendidikan Jasmani, Kesehatan, dan Rekreasi, S1","fakultas":"FIK","judul":"Silat Bugar Nusantara Latihan Silat Kebugaran Untuk Lansia Menuju Bugar","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Yanesti Nuravianda Lestari, S.Gz., M.Gizi","r2":"Dr. sc. hum. Chatila Maharani, ST., M.Kes"},{"no":161,"ketua":"MUHAMMAD DAVIN PRATAMA","nim":"2303010023","prodi":"Pendidikan Sejarah, S1","fakultas":"FISIP","judul":"Pengembangan Cepu Walking Tour sebagai Inovasi Wisata Edukatif Berbasis Sejarah Lokal untuk Mendorong Pekerjaan Layak, Pertumbuhan Ekonomi, dan Pelestarian Kebudayaan","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Dr. sc. hum. Chatila Maharani, ST., M.Kes","r2":"Yustina Dhian Novita, SH., MH"},{"no":162,"ketua":"ANDHITA DEA WAHYU AMANDA","nim":"2307040257","prodi":"Ekonomi Pembangunan, S1","fakultas":"FEB","judul":"FLORENT TABLE DECOR: Inovasi Eco-Decor Meja Intimate","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Devy Lestari, S.Pd., M.Pd.","r2":"Dr. Nurul Fatimah, S.Pd. M.Si"},{"no":163,"ketua":"Yulfa Rahmawati","nim":"2403070061","prodi":"Pendidikan Sosiologi dan Antropologi, S1","fakultas":"FISIP","judul":"Dreamoz FreshCare: Inovasi Layanan Cuci Sepatu Anti-Bau dengan Penggunaan Tawas sebagai Bahan Tambahan yang Lebih Ramah Lingkungan","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Dwi Pangesti Aprilia, S.Pd., M.Pd","r2":"Juwita Ria Rumondang, S.Pd., M.Pd."},{"no":164,"ketua":"Fatimatus Sadia","nim":"2402060029","prodi":"Pendidikan Bahasa Perancis, S1","fakultas":"FBS","judul":"OLA COURSE : BELAJAR ONLINE BAHASA ASING MENYENANGKAN MELALUI MULTIMEDIA","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Devy Lestari, S.Pd., M.Pd.","r2":"Juwita Ria Rumondang, S.Pd., M.Pd."},{"no":165,"ketua":"Dani Fikri Fauzi","nim":"2306010041","prodi":"Pendidikan Jasmani, Kesehatan, dan Rekreasi, S1","fakultas":"FIK","judul":"DESRIS MASSAGE TRAINING: KEPELATIHAN MASSAGE CEDERA OLAHRAGA DAN MASSAGE KEBUGARAN","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Juwita Ria Rumondang, S.Pd., M.Pd.","r2":"Ria Fitrasih, S.Pd., M.Pd"},{"no":166,"ketua":"AKMAL NIBRAS KARTIKO","nim":"2405030010","prodi":"Teknik Arsitektur, S1","fakultas":"FT","judul":"PROGRAM MULTI WISATA DENGAN POLA ONE STOP SERVICES  SEBAGAI UPAYA PEMBERDAYAAN EKONOMI MASYARAKAT DI DESA WISATA KANDRI GUNUNG PATI SEMARANG","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Yanesti Nuravianda Lestari, S.Gz., M.Gizi","r2":"Dr. Nurul Fatimah, S.Pd. M.Si"},{"no":167,"ketua":"QIBTIYA FARAZZUHA","nim":"2306020004","prodi":"Pendidikan Jasmani Sekolah Dasar, S1","fakultas":"FIK","judul":"Photoboothem : Mengabadikan Moment Dengan Inovasi Photobooth Instant Print  Bernuansa Batik Bakaran Untuk Melestarikan Budaya Lokal","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Erisa Aprilia Wicaksari, SE., MM","r2":"Devy Lestari, S.Pd., M.Pd."},{"no":168,"ketua":"Gregorius Pasca Laksono","nim":"2302090001","prodi":"Pendidikan Bahasa Mandarin, S1","fakultas":"FBS","judul":"QIANXIU HANFU GALLERY","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Khairul Arifin, M.Pd.","r2":"Hendra Dedi Kriswanto, S.Pd., M.Pd"},{"no":169,"ketua":"NURFI AINUN NISA","nim":"2306020082","prodi":"Pendidikan Jasmani Sekolah Dasar, S1","fakultas":"FIK","judul":"OPTIMALISASI PEMBINAAN PRESTASI ATLET PENCAK SILAT KENDAL KOTA DI CLUB TP MENUJU PRESTASI PELAJAR TINGKAT PROVINSI DAN NASIONAL","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Erisa Aprilia Wicaksari, SE., MM","r2":"Dr. sc. hum. Chatila Maharani, ST., M.Kes"},{"no":170,"ketua":"Noer Shadrina Insani","nim":"2306010004","prodi":"Pendidikan Jasmani, Kesehatan, dan Rekreasi, S1","fakultas":"FIK","judul":"LA-PRIDE: INOVASI BINGKAI MEDALI BERBASIS VISUALISASI RUTE DAN DATA PERSONAL RECORD DENGAN STRING ART","kategori":"Program Pembinaan Mahasiswa Wirausaha","r1":"Dr. sc. hum. Chatila Maharani, ST., M.Kes","r2":"Khairul Arifin, M.Pd."}];
 
-// ── Derive reviewer list from data ──
 const ALL_REVIEWERS = [...new Set([
   ...PROPOSALS_DATA.map(p=>p.r1),
   ...PROPOSALS_DATA.map(p=>p.r2)
 ])].filter(Boolean).sort();
 
-// ── Rubrik ──
 const RUBRIK = [
   {id:"q1",aspek:"Latar Belakang & Tujuan Mulia",icon:"🎯",bobot:15,
-   deskripsi:"Urgensi masalah dan dampak sosial/lingkungan yang ingin dicapai.",
+   panduan:"Nilai urgensi masalah yang diangkat, kejelasan tujuan, dan dampak sosial/lingkungan yang ingin dicapai.",
    opsi:[
-     {skor:100,label:"Sangat Baik",desk:"Masalah tajam & urgen, dampak sosial terukur, data pendukung kuat."},
-     {skor:75, label:"Baik",       desk:"Masalah cukup jelas, ada dampak sosial namun kurang terukur."},
-     {skor:50, label:"Cukup",      desk:"Masalah umum/standar, tidak ada urgensi nyata."},
-     {skor:25, label:"Kurang",     desk:"Latar belakang sangat lemah, tujuan tidak jelas."}
+     {skor:100,label:"Sangat Baik",desk:"Masalah tajam & urgen, dampak sosial terukur, data pendukung kuat dan relevan."},
+     {skor:75, label:"Baik",       desk:"Masalah cukup jelas, ada dampak sosial namun kurang terukur atau data kurang kuat."},
+     {skor:50, label:"Cukup",      desk:"Masalah bersifat umum/standar, tidak ada urgensi nyata, minim data pendukung."},
+     {skor:25, label:"Kurang",     desk:"Latar belakang sangat lemah, tujuan tidak jelas atau tidak relevan dengan P2MW."}
    ]},
   {id:"q2",aspek:"Segmen Pelanggan & Potensi Pasar",icon:"👥",bobot:20,
-   deskripsi:"Kejelasan target pembeli/pengguna dan besarnya potensi pasar.",
+   panduan:"Nilai kejelasan target pembeli/pengguna, validasi kebutuhan, dan besarnya potensi pasar yang tersedia.",
    opsi:[
-     {skor:100,label:"Sangat Baik",desk:"Target spesifik, tervalidasi empiris, ada data TAM/SAM/SOM."},
-     {skor:75, label:"Baik",       desk:"Target cukup spesifik, ada beberapa data pasar."},
-     {skor:50, label:"Cukup",      desk:"Target terlalu luas, tidak ada analisis pasar memadai."},
-     {skor:25, label:"Kurang",     desk:"Tidak ada pemahaman segmen, tidak ada data."}
+     {skor:100,label:"Sangat Baik",desk:"Target spesifik, tervalidasi secara empiris, ada data TAM/SAM/SOM yang mendukung."},
+     {skor:75, label:"Baik",       desk:"Target cukup spesifik, ada beberapa data pasar meskipun tidak lengkap."},
+     {skor:50, label:"Cukup",      desk:"Target terlalu luas/umum, tidak ada analisis pasar yang memadai."},
+     {skor:25, label:"Kurang",     desk:"Tidak ada pemahaman segmen yang jelas, tidak didukung data apapun."}
    ]},
   {id:"q3",aspek:"Inovasi / Keunikan Produk",icon:"💡",bobot:20,
-   deskripsi:"Inovasi yang ditawarkan dan keunggulan kompetitif dibanding pesaing.",
+   panduan:"Nilai tingkat orisinalitas inovasi, keunggulan kompetitif dibanding produk serupa yang sudah ada.",
    opsi:[
-     {skor:100,label:"Sangat Baik",desk:"Inovasi kuat & orisinal, keunggulan kompetitif jelas, sulit ditiru."},
-     {skor:75, label:"Baik",       desk:"Ada inovasi terdiferensiasi, masih ada pesaing serupa."},
-     {skor:50, label:"Cukup",      desk:"Inovasi minim, produk hampir identik dengan yang ada di pasar."},
-     {skor:25, label:"Kurang",     desk:"Tidak ada inovasi, produk sangat umum/komoditas."}
+     {skor:100,label:"Sangat Baik",desk:"Inovasi kuat & orisinal, keunggulan kompetitif jelas terdefinisi, sulit ditiru pesaing."},
+     {skor:75, label:"Baik",       desk:"Ada inovasi yang terdiferensiasi, meskipun masih ada produk sejenis di pasar."},
+     {skor:50, label:"Cukup",      desk:"Inovasi minim, produk hampir identik dengan yang sudah ada, diferensiasi lemah."},
+     {skor:25, label:"Kurang",     desk:"Tidak ada inovasi berarti, produk sangat umum/komoditas tanpa nilai tambah."}
    ]},
   {id:"q4",aspek:"Strategi Pemasaran & Distribusi",icon:"📣",bobot:20,
-   deskripsi:"Kelengkapan dan relevansi strategi pemasaran serta saluran distribusi.",
+   panduan:"Nilai kelengkapan dan relevansi strategi pemasaran, saluran distribusi, dan proyeksi penjualan.",
    opsi:[
-     {skor:100,label:"Sangat Baik",desk:"Strategi komprehensif, multi-channel, relevan, ada proyeksi penjualan."},
-     {skor:75, label:"Baik",       desk:"Ada strategi relevan, distribusi cukup jelas meski belum lengkap."},
-     {skor:50, label:"Cukup",      desk:"Hanya promosi medsos umum tanpa analisis mendalam."},
-     {skor:25, label:"Kurang",     desk:"Tidak ada strategi pemasaran yang jelas."}
+     {skor:100,label:"Sangat Baik",desk:"Strategi komprehensif, multi-channel, sangat relevan, ada proyeksi penjualan yang realistis."},
+     {skor:75, label:"Baik",       desk:"Ada strategi pemasaran yang relevan, saluran distribusi cukup jelas meski belum lengkap."},
+     {skor:50, label:"Cukup",      desk:"Hanya promosi media sosial umum tanpa analisis mendalam, proyeksi tidak realistis."},
+     {skor:25, label:"Kurang",     desk:"Tidak ada strategi pemasaran yang jelas atau sama sekali tidak dibahas."}
    ]},
   {id:"q5",aspek:"Sumber Daya Manusia / Tim",icon:"🧑‍🤝‍🧑",bobot:15,
-   deskripsi:"Komposisi, kelayakan, dan kapabilitas tim dalam menjalankan usaha.",
+   panduan:"Nilai komposisi, kompetensi, dan relevansi keahlian tim terhadap bidang usaha yang dijalankan.",
    opsi:[
-     {skor:100,label:"Sangat Baik",desk:"Keahlian beragam, saling melengkapi, relevan, ada track record."},
-     {skor:75, label:"Baik",       desk:"Tim cukup kompeten, ada gap keahlian di beberapa bidang."},
-     {skor:50, label:"Cukup",      desk:"Tim kurang kompeten atau keahlian tidak relevan."},
-     {skor:25, label:"Kurang",     desk:"Tim tidak memadai untuk menjalankan usaha."}
+     {skor:100,label:"Sangat Baik",desk:"Keahlian tim beragam, saling melengkapi, relevan dengan usaha, ada track record kegiatan."},
+     {skor:75, label:"Baik",       desk:"Tim cukup kompeten, ada sedikit gap keahlian di beberapa bidang."},
+     {skor:50, label:"Cukup",      desk:"Tim kurang kompeten atau keahlian tidak cukup relevan dengan jenis usaha."},
+     {skor:25, label:"Kurang",     desk:"Tim tidak memadai untuk menjalankan usaha yang diusulkan."}
    ]},
   {id:"q6",aspek:"Rencana Anggaran Biaya (RAB)",icon:"💰",bobot:10,
-   deskripsi:"Kesesuaian, kewajaran, dan ketaatan RAB terhadap ketentuan P2MW.",
+   panduan:"Nilai kewajaran, ketaatan terhadap ketentuan P2MW, dan detail anggaran yang diajukan.",
    opsi:[
-     {skor:100,label:"Sangat Baik",desk:"RAB detail & wajar, sesuai batas P2MW, tidak ada item terlarang."},
-     {skor:75, label:"Baik",       desk:"RAB cukup detail dan sesuai ketentuan, ada beberapa item perlu klarifikasi."},
-     {skor:50, label:"Cukup",      desk:"RAB kurang detail, ada item menyalahi ketentuan."},
-     {skor:25, label:"Kurang",     desk:"RAB tidak realistis, banyak item tidak sesuai/terlarang."}
+     {skor:100,label:"Sangat Baik",desk:"RAB sangat detail & wajar, sepenuhnya sesuai batas dan ketentuan P2MW, tidak ada item terlarang."},
+     {skor:75, label:"Baik",       desk:"RAB cukup detail dan sesuai ketentuan, ada beberapa item yang perlu klarifikasi."},
+     {skor:50, label:"Cukup",      desk:"RAB kurang detail, ada beberapa item yang menyalahi ketentuan P2MW."},
+     {skor:25, label:"Kurang",     desk:"RAB tidak realistis, banyak item tidak sesuai/terlarang menurut panduan P2MW."}
    ]}
 ];
 
 const SYARAT_ADMIN = [
-  {id:"sa1",label:"Format proposal sesuai panduan (margin, font, sistematika)"},
-  {id:"sa2",label:"Identitas lengkap: nama ketua & dosen pembimbing tercantum"},
-  {id:"sa3",label:"Biodata seluruh anggota tim dilampirkan"},
-  {id:"sa4",label:"Seluruh anggota berstatus mahasiswa aktif (ada KTM/surat)"}
+  {id:"sa1",label:"Format proposal sesuai panduan (margin, font, sistematika bab)"},
+  {id:"sa2",label:"Identitas lengkap: nama ketua & dosen pembimbing tercantum jelas"},
+  {id:"sa3",label:"Biodata seluruh anggota tim dilampirkan dengan lengkap"},
+  {id:"sa4",label:"Seluruh anggota berstatus mahasiswa aktif (dilampiri KTM/surat keterangan)"}
 ];
 
-// ── PDF.js ──
-function usePdfJs(){
-  const [ready,setReady]=useState(false);
-  useEffect(()=>{
-    if(window.pdfjsLib){setReady(true);return;}
-    const s=document.createElement("script");
-    s.src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
-    s.onload=()=>{
-      window.pdfjsLib.GlobalWorkerOptions.workerSrc=
-        "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
-      setReady(true);
-    };
-    document.head.appendChild(s);
-  },[]);
-  return ready;
-}
-
+// ── PDF.js helper ──
 async function extractPDF(file){
-  const buf=await file.arrayBuffer();
-  const pdf=await window.pdfjsLib.getDocument({data:buf}).promise;
-  const maxP=Math.min(pdf.numPages,40);
-  let txt="";
+  if(!window.pdfjsLib) throw new Error("PDF.js belum siap, coba lagi.");
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+  const buf = await file.arrayBuffer();
+  const pdf = await window.pdfjsLib.getDocument({data:buf}).promise;
+  const maxP = Math.min(pdf.numPages, 35);
+  let txt = "";
   for(let i=1;i<=maxP;i++){
-    const pg=await pdf.getPage(i);
-    const ct=await pg.getTextContent();
-    txt+=`\n[Hal ${i}]\n`+ct.items.map(x=>x.str).join(" ")+"\n";
+    const pg = await pdf.getPage(i);
+    const ct = await pg.getTextContent();
+    txt += `\n[Hal ${i}]\n` + ct.items.map(x=>x.str).join(" ");
   }
-  return{text:txt.trim(),totalPages:pdf.numPages,extractedPages:maxP};
+  return {text:txt.trim(), totalPages:pdf.numPages, extractedPages:maxP};
 }
 
 // ══════════════════════════════════════
-//  SCREEN 1: LOGIN
+//  SCREEN 1 — LOGIN
 // ══════════════════════════════════════
 function LoginScreen({onLogin}){
   const [name,setName]=useState("");
-  const myProposals = name ? PROPOSALS_DATA.filter(p=>p.r1===name||p.r2===name) : [];
+  const myCount = name ? PROPOSALS_DATA.filter(p=>p.r1===name||p.r2===name).length : 0;
+  const apiReady = ZAI_API_KEY !== "GANTI_DENGAN_API_KEY_ANDA";
   return(
     <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 flex items-center justify-center p-4">
       <div className="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-md fade-in">
         <div className="text-center mb-6">
-          <div className="text-4xl mb-3">🎓</div>
+          <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4">🎓</div>
           <h1 className="text-xl font-black text-slate-800">Sistem Penilaian P2MW</h1>
-          <div className="text-sm font-semibold text-blue-600 mt-1">UNNES 2026</div>
-          <p className="text-xs text-slate-500 mt-2">Universitas Negeri Semarang · Ditjen Diktiristek</p>
+          <div className="text-sm font-bold text-blue-600 mt-1">UNNES 2026</div>
+          <p className="text-xs text-slate-400 mt-1">Universitas Negeri Semarang · Ditjen Diktiristek</p>
         </div>
 
-        <div className="space-y-4">
+        {/* Status AI */}
+        <div className={`rounded-xl p-3 mb-4 flex items-center gap-2 text-xs font-semibold
+          ${apiReady?"bg-emerald-50 border border-emerald-200 text-emerald-700":"bg-amber-50 border border-amber-200 text-amber-700"}`}>
+          <span className="text-base">{apiReady?"🤖":"⚠️"}</span>
+          {apiReady
+            ? <span>Analisis AI <b>GLM-4.7-Flash</b> siap digunakan</span>
+            : <span>API Key belum diisi — mode manual aktif. <br/>Edit baris <code className="bg-amber-100 px-1 rounded">ZAI_API_KEY</code> di index.html</span>
+          }
+        </div>
+
+        <div className="space-y-3">
           <div>
-            <label className="text-xs font-bold text-slate-600 block mb-2">Pilih Nama Reviewer</label>
+            <label className="text-xs font-bold text-slate-600 block mb-2">Pilih Nama Anda</label>
             <select value={name} onChange={e=>setName(e.target.value)}
-              className="w-full text-sm border-2 border-slate-200 rounded-xl px-3 py-3 focus:outline-none focus:border-blue-500 bg-white">
-              <option value="">— Pilih nama Anda —</option>
+              className="w-full text-sm border-2 border-slate-200 rounded-xl px-3 py-3 focus:outline-none focus:border-blue-500">
+              <option value="">— Pilih nama reviewer —</option>
               {ALL_REVIEWERS.map(r=><option key={r} value={r}>{r}</option>)}
             </select>
           </div>
-
-          {name && (
+          {name&&(
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs text-blue-700 fade-in">
-              <span className="font-bold">📋 {myProposals.length} proposal</span> menunggu penilaian Anda
+              📋 <b>{myCount} proposal</b> ditugaskan kepada Anda
             </div>
           )}
-
-          <button onClick={()=>onLogin(name)} disabled={!name}
+          <button onClick={()=>name&&onLogin(name)} disabled={!name}
             className="w-full bg-blue-700 hover:bg-blue-800 disabled:opacity-40 text-white font-bold py-3 rounded-xl text-sm transition-all shadow-lg">
             Masuk ke Dashboard →
           </button>
         </div>
 
-        <p className="text-xs text-center text-slate-400 mt-6">
-          Sistem ini menggunakan AI Gemini untuk analisis awal.<br/>Keputusan akhir tetap di tangan reviewer.
-        </p>
+        <div className="mt-5 bg-slate-50 rounded-xl p-4 text-xs text-slate-500 space-y-1">
+          <div className="font-semibold text-slate-600 mb-2">📖 Alur penilaian:</div>
+          <div>1. Pilih nama → masuk dashboard</div>
+          <div>2. Pilih proposal yang akan dinilai</div>
+          <div>3. Upload PDF → klik Analisis AI (opsional)</div>
+          <div>4. Verifikasi & sesuaikan skor di rubrik</div>
+          <div>5. Cetak / simpan sebagai PDF</div>
+        </div>
       </div>
     </div>
   );
 }
 
 // ══════════════════════════════════════
-//  SCREEN 2: DASHBOARD
+//  SCREEN 2 — DASHBOARD
 // ══════════════════════════════════════
-function DashboardScreen({reviewer, onSelectProposal, onLogout, completedNos}){
+function DashboardScreen({reviewer, onSelect, onLogout, doneSet}){
   const proposals = PROPOSALS_DATA.filter(p=>p.r1===reviewer||p.r2===reviewer);
-  const done = proposals.filter(p=>completedNos.has(p.no)).length;
+  const done = proposals.filter(p=>doneSet.has(p.no)).length;
   const [search,setSearch]=useState("");
-  const [filterStatus,setFilterStatus]=useState("all");
+  const [filter,setFilter]=useState("all");
+  const pct = proposals.length ? Math.round(done/proposals.length*100) : 0;
 
-  const filtered = proposals.filter(p=>{
+  const list = proposals.filter(p=>{
     const s=search.toLowerCase();
-    const matchSearch=!s||p.ketua.toLowerCase().includes(s)||p.judul.toLowerCase().includes(s)||String(p.no).includes(s);
-    const isDone=completedNos.has(p.no);
-    const matchStatus=filterStatus==="all"||(filterStatus==="done"&&isDone)||(filterStatus==="pending"&&!isDone);
-    return matchSearch&&matchStatus;
+    const ok=!s||p.ketua.toLowerCase().includes(s)||p.judul.toLowerCase().includes(s)||String(p.no).includes(s);
+    const isDone=doneSet.has(p.no);
+    return ok&&(filter==="all"||(filter==="done"&&isDone)||(filter==="todo"&&!isDone));
   });
 
   return(
     <div className="min-h-screen bg-slate-100">
-      {/* Header */}
       <header className="bg-gradient-to-r from-blue-800 to-indigo-700 text-white no-print">
-        <div className="max-w-4xl mx-auto px-5 py-4">
-          <div className="flex items-center justify-between">
+        <div className="max-w-3xl mx-auto px-5 py-5">
+          <div className="flex items-start justify-between gap-4">
             <div>
-              <div className="text-xs text-blue-200 font-semibold uppercase tracking-wider">P2MW UNNES 2026</div>
-              <h1 className="font-black text-lg">Dashboard Reviewer</h1>
-              <div className="text-blue-200 text-sm">{reviewer}</div>
+              <div className="text-xs text-blue-200 uppercase tracking-widest font-semibold">P2MW UNNES 2026</div>
+              <h1 className="text-lg font-black mt-0.5">Dashboard Reviewer</h1>
+              <div className="text-blue-100 text-sm font-medium">{reviewer}</div>
             </div>
-            <div className="text-right">
-              <div className="text-2xl font-black">{done}/{proposals.length}</div>
+            <div className="text-right shrink-0">
+              <div className="text-3xl font-black">{done}<span className="text-blue-300 text-xl">/{proposals.length}</span></div>
               <div className="text-xs text-blue-200">selesai dinilai</div>
-              <button onClick={onLogout} className="mt-2 text-xs text-blue-300 hover:text-white underline">Ganti Reviewer</button>
+              <button onClick={onLogout} className="mt-1 text-xs text-blue-300 hover:text-white underline">Ganti</button>
             </div>
           </div>
-          {/* Progress */}
-          <div className="mt-3 bg-blue-900 rounded-full h-2">
-            <div className="bg-emerald-400 rounded-full h-2 transition-all duration-700"
-              style={{width:`${proposals.length?done/proposals.length*100:0}%`}}/>
+          <div className="mt-3">
+            <div className="flex justify-between text-xs text-blue-200 mb-1"><span>Progress</span><span>{pct}%</span></div>
+            <div className="bg-blue-900 rounded-full h-2.5">
+              <div className="bg-emerald-400 h-2.5 rounded-full transition-all duration-700" style={{width:`${pct}%`}}/>
+            </div>
           </div>
-          <div className="text-xs text-blue-300 mt-1">{proposals.length-done} proposal belum dinilai</div>
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 py-5 space-y-4">
-        {/* Search & Filter */}
-        <div className="flex gap-3 flex-wrap no-print">
+      <main className="max-w-3xl mx-auto px-4 py-5 space-y-3">
+        <div className="flex gap-2 flex-wrap no-print">
           <input value={search} onChange={e=>setSearch(e.target.value)}
-            placeholder="🔍 Cari nama ketua atau judul..."
-            className="flex-1 min-w-48 text-sm border border-slate-200 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white"/>
+            placeholder="🔍 Cari nama atau judul..."
+            className="flex-1 min-w-40 text-sm border border-slate-200 bg-white rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-300"/>
           <div className="flex gap-2">
-            {[["all","Semua"],["pending","Belum"],["done","Selesai"]].map(([v,l])=>(
-              <button key={v} onClick={()=>setFilterStatus(v)}
-                className={`px-3 py-2 rounded-xl text-xs font-bold transition-all
-                  ${filterStatus===v?"bg-blue-600 text-white shadow":"bg-white text-slate-600 border border-slate-200 hover:border-blue-300"}`}>
-                {l}
+            {[["all","Semua",proposals.length],["todo","Belum",proposals.length-done],["done","Selesai",done]].map(([v,l,c])=>(
+              <button key={v} onClick={()=>setFilter(v)}
+                className={`px-3 py-2 text-xs font-bold rounded-xl transition-all
+                  ${filter===v?"bg-blue-600 text-white shadow":"bg-white text-slate-600 border border-slate-200 hover:border-blue-300"}`}>
+                {l} <span className="opacity-70">{c}</span>
               </button>
             ))}
           </div>
         </div>
 
-        {/* Proposal cards */}
+        {list.length===0&&(
+          <div className="text-center py-16 text-slate-400">
+            <div className="text-5xl mb-3">📭</div>
+            <div className="text-sm">Tidak ada proposal ditemukan</div>
+          </div>
+        )}
+
         <div className="space-y-2">
-          {filtered.map(p=>{
-            const isDone=completedNos.has(p.no);
+          {list.map(p=>{
             const isR1=p.r1===reviewer;
+            const isDone=doneSet.has(p.no);
             return(
-              <div key={`${p.no}-${isR1?1:2}`}
-                onClick={()=>onSelectProposal(p,isR1?1:2)}
-                className={`bg-white rounded-2xl border-2 p-4 cursor-pointer transition-all hover:shadow-md hover:-translate-y-0.5 fade-in
-                  ${isDone?"border-emerald-200 bg-emerald-50":"border-slate-100 hover:border-blue-200"}`}>
-                <div className="flex items-start gap-3">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0
-                    ${isDone?"bg-emerald-100":"bg-blue-50"}`}>
+              <div key={`${p.no}-${isR1?1:2}`} onClick={()=>onSelect(p,isR1?1:2)}
+                className={`bg-white rounded-2xl border-2 p-4 cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all fade-in
+                  ${isDone?"border-emerald-200 bg-emerald-50/40":"border-slate-100 hover:border-blue-200"}`}>
+                <div className="flex items-center gap-3">
+                  <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-xl shrink-0 ${isDone?"bg-emerald-100":"bg-blue-50"}`}>
                     {isDone?"✅":"📄"}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <span className="text-xs font-black text-slate-400">#{p.no}</span>
-                      <span className="text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full">{p.fakultas}</span>
-                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${isR1?"bg-indigo-50 text-indigo-700":"bg-purple-50 text-purple-700"}`}>
-                        Reviewer {isR1?"1":"2"}
-                      </span>
-                      {isDone&&<span className="text-xs font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">✓ Selesai</span>}
+                    <div className="flex gap-2 mb-1 flex-wrap items-center">
+                      <span className="text-xs font-black text-slate-300">#{p.no}</span>
+                      <span className="text-xs font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{p.fakultas}</span>
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${isR1?"bg-indigo-100 text-indigo-700":"bg-violet-100 text-violet-700"}`}>R{isR1?1:2}</span>
+                      {isDone&&<span className="text-xs font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">✓ Selesai</span>}
                     </div>
-                    <div className="font-semibold text-slate-800 text-sm leading-snug truncate">{p.judul}</div>
-                    <div className="text-xs text-slate-500 mt-1">{p.ketua} · {p.prodi}</div>
+                    <div className="font-semibold text-slate-800 text-sm leading-snug line-clamp-1">{p.judul}</div>
+                    <div className="text-xs text-slate-400 mt-0.5">{p.ketua}</div>
                   </div>
-                  <div className="text-slate-300 text-lg shrink-0">›</div>
+                  <div className="text-slate-300 text-xl shrink-0">›</div>
                 </div>
               </div>
             );
           })}
-          {filtered.length===0&&(
-            <div className="text-center py-12 text-slate-400">
-              <div className="text-4xl mb-2">🔍</div>
-              <div className="text-sm">Tidak ada proposal ditemukan</div>
-            </div>
-          )}
         </div>
       </main>
     </div>
@@ -282,422 +281,409 @@ function DashboardScreen({reviewer, onSelectProposal, onLogout, completedNos}){
 }
 
 // ══════════════════════════════════════
-//  SCREEN 3: FORM PENILAIAN
+//  SCREEN 3 — FORM PENILAIAN
 // ══════════════════════════════════════
-function ReviewScreen({proposal, reviewerName, reviewerSlot, onBack, onComplete}){
-  const pdfJsReady=usePdfJs();
-
-  // State
+function ReviewScreen({proposal, reviewer, slot, onBack, onDone}){
   const [adminChecks,setAdminChecks]=useState({});
   const [scores,setScores]=useState({});
   const [komentar,setKomentar]=useState("");
   const [saran,setSaran]=useState("");
-  const [inputMode,setInputMode]=useState("upload");
-  const [proposalText,setProposalText]=useState("");
+  const [openGuide,setOpenGuide]=useState(null);
+
+  // AI state
+  const [pdfText,setPdfText]=useState("");
   const [fileInfo,setFileInfo]=useState(null);
-  const [isDragging,setIsDragging]=useState(false);
+  const [isDrag,setIsDrag]=useState(false);
   const [isExtracting,setIsExtracting]=useState(false);
-  const [uploadError,setUploadError]=useState("");
-  const [aiAnalysis,setAiAnalysis]=useState(null);
+  const [pdfError,setPdfError]=useState("");
   const [isAnalyzing,setIsAnalyzing]=useState(false);
+  const [aiResult,setAiResult]=useState(null);
   const [aiError,setAiError]=useState("");
   const [aiApplied,setAiApplied]=useState(false);
+  const [showAI,setShowAI]=useState(true);
   const fileRef=useRef();
 
-  const totalScore=RUBRIK.reduce((a,r)=>scores[r.id]!==undefined?a+(scores[r.id]/100)*r.bobot:a,0);
-  const scoredCount=RUBRIK.filter(r=>scores[r.id]!==undefined).length;
-  const allScored=scoredCount===RUBRIK.length;
-  const adminOk=SYARAT_ADMIN.every(s=>adminChecks[s.id]);
+  const scored = RUBRIK.filter(r=>scores[r.id]!==undefined).length;
+  const allScored = scored===RUBRIK.length;
+  const adminOk = SYARAT_ADMIN.every(s=>adminChecks[s.id]);
+  const total = RUBRIK.reduce((a,r)=>scores[r.id]!==undefined?a+(scores[r.id]/100)*r.bobot:a,0);
+  const today = new Date().toLocaleDateString("id-ID",{day:"numeric",month:"long",year:"numeric"});
+  const apiReady = ZAI_API_KEY !== "GANTI_DENGAN_API_KEY_ANDA";
 
   const getRec=s=>{
     if(!allScored)return null;
-    if(s>=75)return{label:"REKOMENDASIKAN LOLOS ✓",bg:"bg-emerald-600",txt:"text-emerald-600"};
-    if(s>=55)return{label:"PERLU REVISI MAYOR ⚠",bg:"bg-amber-500",txt:"text-amber-600"};
-    return{label:"TIDAK DIREKOMENDASIKAN ✗",bg:"bg-rose-600",txt:"text-rose-600"};
+    if(s>=75)return{label:"REKOMENDASIKAN LOLOS",bg:"bg-emerald-600",ring:"ring-emerald-400",icon:"✓"};
+    if(s>=55)return{label:"REVISI MAYOR DIPERLUKAN",bg:"bg-amber-500",ring:"ring-amber-400",icon:"⚠"};
+    return{label:"TIDAK DIREKOMENDASIKAN",bg:"bg-rose-600",ring:"ring-rose-400",icon:"✗"};
   };
-  const rec=getRec(totalScore);
+  const rec=getRec(total);
 
-  // PDF Upload
+  // PDF processing
   const processFile=useCallback(async(file)=>{
     if(!file)return;
-    if(file.type!=="application/pdf"){setUploadError("Hanya file PDF.");return;}
-    if(file.size>20*1024*1024){setUploadError("Maks 20 MB.");return;}
-    setUploadError("");setIsExtracting(true);
+    if(file.type!=="application/pdf"){setPdfError("Hanya file PDF.");return;}
+    if(file.size>20*1024*1024){setPdfError("Maks 20 MB.");return;}
+    setPdfError("");setIsExtracting(true);
     setFileInfo({name:file.name,size:(file.size/1024).toFixed(0)});
     try{
       const{text,totalPages,extractedPages}=await extractPDF(file);
-      if(!text||text.length<50){
-        setUploadError("PDF tidak bisa dibaca (kemungkinan scan/gambar). Gunakan tab Tempel Teks.");
-        setIsExtracting(false);return;
-      }
-      setProposalText(text);
+      if(!text||text.length<50){setPdfError("PDF tidak bisa dibaca (kemungkinan scan/gambar).");setIsExtracting(false);return;}
+      setPdfText(text);
       setFileInfo(f=>({...f,totalPages,extractedPages,chars:text.length}));
-    }catch(e){setUploadError("Gagal baca PDF: "+e.message);}
+    }catch(e){setPdfError("Gagal baca PDF: "+e.message);}
     finally{setIsExtracting(false);}
   },[]);
 
   // AI Analysis
-  const analyze=async()=>{
-    if(!proposalText.trim()){setAiError("Upload PDF atau tempel teks terlebih dahulu.");return;}
-    if(GEMINI_API_KEY==="GANTI_DENGAN_API_KEY_GEMINI_ANDA"){
-      setAiError("API Key belum dikonfigurasi. Edit file index.html dan isi GEMINI_API_KEY.");return;
-    }
-    setIsAnalyzing(true);setAiError("");setAiAnalysis(null);
-    const prompt=`Anda adalah evaluator proposal P2MW UNNES 2026 yang berpengalaman dan objektif.
+  const doAnalyze=async()=>{
+    if(!pdfText.trim()){setAiError("Upload PDF terlebih dahulu.");return;}
+    if(!apiReady){setAiError("API Key belum diisi di file index.html.");return;}
+    setIsAnalyzing(true);setAiError("");setAiResult(null);
+    const prompt=`Anda adalah evaluator proposal P2MW UNNES 2026 yang berpengalaman dan objektif. Evaluasi proposal berikut secara kritis.
 
-Judul Proposal: "${proposal.judul}"
-Pengusul: ${proposal.ketua} (${proposal.prodi}, ${proposal.fakultas})
+Judul: "${proposal.judul}"
+Pengusul: ${proposal.ketua} | ${proposal.prodi} | ${proposal.fakultas}
 
-Teks proposal:
+TEKS PROPOSAL:
 ---
-${proposalText.substring(0,10000)}
+${pdfText.substring(0,9000)}
 ---
 
-Evaluasi 6 kriteria P2MW 2026. Pilih skor: 100, 75, 50, atau 25.
-q1 - Latar Belakang & Tujuan Mulia (15%): urgensi masalah, dampak sosial
-q2 - Segmen Pelanggan & Potensi Pasar (20%): kejelasan target, validasi, data pasar  
-q3 - Inovasi / Keunikan Produk (20%): orisinalitas, keunggulan kompetitif
-q4 - Strategi Pemasaran & Distribusi (20%): kelengkapan, distribusi, proyeksi
-q5 - SDM / Tim (15%): komposisi, kompetensi, relevansi
-q6 - RAB (10%): kewajaran, ketaatan ketentuan
+Evaluasi 6 kriteria P2MW 2026. Pilih SATU skor: 100, 75, 50, atau 25.
+q1 - Latar Belakang & Tujuan Mulia (bobot 15%): urgensi masalah, dampak sosial
+q2 - Segmen Pelanggan & Potensi Pasar (bobot 20%): kejelasan target, validasi, data pasar
+q3 - Inovasi / Keunikan Produk (bobot 20%): orisinalitas, keunggulan kompetitif
+q4 - Strategi Pemasaran & Distribusi (bobot 20%): kelengkapan, distribusi, proyeksi
+q5 - SDM / Tim (bobot 15%): komposisi, kompetensi, relevansi
+q6 - RAB (bobot 10%): kewajaran, ketaatan ketentuan P2MW
 
-Jika info kurang → skor 50 alasan "informasi tidak cukup."
-Jawab HANYA JSON valid tanpa markdown:
-{"q1":{"skor":75,"alasan":"2-3 kalimat spesifik."},"q2":{"skor":50,"alasan":"..."},"q3":{"skor":75,"alasan":"..."},"q4":{"skor":50,"alasan":"..."},"q5":{"skor":75,"alasan":"..."},"q6":{"skor":75,"alasan":"..."},"kekuatan":["...","...","..."],"kelemahan":["...","...","..."],"catatan_umum":"2-3 kalimat ringkasan."}`;
+Jika informasi tidak cukup untuk menilai suatu kriteria, beri skor 50 dengan alasan "informasi tidak cukup dalam teks yang tersedia."
+Berikan alasan spesifik 2-3 kalimat per kriteria berdasarkan isi proposal.
+
+PENTING: Jawab HANYA dengan JSON valid, tanpa markdown, tanpa penjelasan lain:
+{"q1":{"skor":75,"alasan":"..."},"q2":{"skor":50,"alasan":"..."},"q3":{"skor":75,"alasan":"..."},"q4":{"skor":50,"alasan":"..."},"q5":{"skor":75,"alasan":"..."},"q6":{"skor":75,"alasan":"..."},"kekuatan":["...","..."],"kelemahan":["...","..."],"ringkasan":"2-3 kalimat penilaian umum."}`;
 
     try{
-      const res=await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
-        {method:"POST",headers:{"Content-Type":"application/json"},
-         body:JSON.stringify({contents:[{parts:[{text:prompt}]}],
-           generationConfig:{temperature:0.1,maxOutputTokens:1500}})}
-      );
-      if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e?.error?.message||`HTTP ${res.status}`);}
+      const res=await fetch(ZAI_URL,{
+        method:"POST",
+        headers:{"Content-Type":"application/json","Authorization":`Bearer ${ZAI_API_KEY}`},
+        body:JSON.stringify({model:ZAI_MODEL,messages:[{role:"user",content:prompt}],
+          temperature:0.1,max_tokens:1500})
+      });
+      if(!res.ok){
+        const e=await res.json().catch(()=>({}));
+        const msg=e?.error?.message||`HTTP ${res.status}`;
+        if(res.status===401||res.status===403)throw new Error("API Key tidak valid. Pastikan sudah diisi dengan benar.");
+        throw new Error(msg);
+      }
       const data=await res.json();
-      const raw=data?.candidates?.[0]?.content?.parts?.[0]?.text||"";
-      if(!raw)throw new Error("Respons AI kosong.");
+      const raw=data?.choices?.[0]?.message?.content||"";
+      if(!raw)throw new Error("Respons AI kosong. Coba lagi.");
       const clean=raw.replace(/```json|```/g,"").trim();
       const j=clean.indexOf("{"),k=clean.lastIndexOf("}");
-      if(j<0||k<0)throw new Error("Format respons tidak valid.");
-      setAiAnalysis(JSON.parse(clean.slice(j,k+1)));
-      setAiApplied(false);
-    }catch(e){
-      if(e.message.includes("API_KEY")||e.message.includes("400"))
-        setAiError("API Key tidak valid. Periksa GEMINI_API_KEY di file index.html.");
-      else setAiError("Analisis gagal: "+e.message);
-    }finally{setIsAnalyzing(false);}
+      if(j<0||k<0)throw new Error("Format JSON tidak valid dari AI.");
+      setAiResult(JSON.parse(clean.slice(j,k+1)));
+    }catch(e){setAiError(e.message);}
+    finally{setIsAnalyzing(false);}
   };
 
   const applyAI=()=>{
-    if(!aiAnalysis)return;
+    if(!aiResult)return;
     const ns={};
-    RUBRIK.forEach(r=>{if(aiAnalysis[r.id]?.skor)ns[r.id]=aiAnalysis[r.id].skor;});
-    setScores(p=>({...ns,...p}));
+    RUBRIK.forEach(r=>{if(aiResult[r.id]?.skor)ns[r.id]=aiResult[r.id].skor;});
+    setScores(p=>({...p,...ns}));
     setAiApplied(true);
-  };
-
-  const handleComplete=()=>{
-    if(!allScored)return;
-    onComplete(proposal.no);
-    window.scrollTo(0,0);
   };
 
   return(
     <div className="min-h-screen bg-slate-100">
-      {/* Header */}
-      <header className="bg-gradient-to-r from-blue-800 to-indigo-700 text-white shadow-lg no-print sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-3">
-          <button onClick={onBack} className="bg-white/20 hover:bg-white/30 text-white text-xs font-bold px-3 py-2 rounded-xl transition-all">
-            ← Kembali
-          </button>
-          <div className="flex-1 min-w-0">
-            <div className="text-xs text-blue-200">Proposal #{proposal.no} · Reviewer {reviewerSlot} · {reviewerName}</div>
-            <div className="font-bold text-sm truncate">{proposal.judul}</div>
+      {/* Sticky header */}
+      <header className="bg-gradient-to-r from-blue-800 to-indigo-700 text-white no-print sticky top-0 z-20 shadow-lg">
+        <div className="max-w-3xl mx-auto px-4 py-3">
+          <div className="flex items-center gap-3">
+            <button onClick={onBack} className="bg-white/20 hover:bg-white/30 text-white text-xs font-bold px-3 py-1.5 rounded-lg shrink-0">← Kembali</button>
+            <div className="flex-1 min-w-0">
+              <div className="text-xs text-blue-200">#{proposal.no} · {proposal.fakultas} · Reviewer {slot}</div>
+              <div className="font-bold text-sm truncate">{proposal.judul}</div>
+            </div>
+            {rec
+              ? <div className={`${rec.bg} text-white text-sm font-black px-3 py-1 rounded-xl shrink-0`}>{total.toFixed(0)}</div>
+              : <div className="text-blue-200 text-xs shrink-0">{scored}/{RUBRIK.length}</div>
+            }
           </div>
-          <div className="text-right shrink-0">
-            {rec?(
-              <div className={`${rec.bg} text-white text-xs font-bold px-3 py-1 rounded-lg`}>{totalScore.toFixed(0)}</div>
-            ):(
-              <div className="text-blue-200 text-xs">{scoredCount}/{RUBRIK.length}</div>
-            )}
-          </div>
-        </div>
-        <div className="max-w-4xl mx-auto px-4 pb-2">
-          <div className="bg-blue-900 rounded-full h-1.5">
-            <div className="bg-blue-300 h-1.5 rounded-full transition-all duration-500"
-              style={{width:`${scoredCount/RUBRIK.length*100}%`}}/>
+          <div className="mt-2 bg-blue-900 rounded-full h-1.5">
+            <div className="bg-blue-200 h-1.5 rounded-full transition-all" style={{width:`${scored/RUBRIK.length*100}%`}}/>
           </div>
         </div>
       </header>
 
       {/* Print header */}
-      <div className="hidden print:block p-6 border-b-2 border-slate-800 mb-4">
-        <div className="text-center">
-          <div className="font-black text-xl">FORMULIR PENILAIAN PROPOSAL P2MW UNNES 2026</div>
-          <div className="text-sm text-slate-500 mt-1">Universitas Negeri Semarang · Program Pemberdayaan Mahasiswa Wirausaha</div>
+      <div className="hidden print:block px-8 pt-6 pb-4 border-b-2 border-slate-700">
+        <div className="text-center mb-4">
+          <div className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Universitas Negeri Semarang</div>
+          <div className="text-xl font-black mt-1">FORMULIR PENILAIAN PROPOSAL P2MW 2026</div>
         </div>
-        <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
-          <div><b>No. Proposal:</b> #{proposal.no}</div>
-          <div><b>Fakultas:</b> {proposal.fakultas}</div>
-          <div><b>Ketua Tim:</b> {proposal.ketua}</div>
-          <div><b>NIM:</b> {proposal.nim}</div>
-          <div className="col-span-2"><b>Judul:</b> {proposal.judul}</div>
-          <div><b>Reviewer:</b> {reviewerName}</div>
-          <div><b>Posisi:</b> Reviewer {reviewerSlot}</div>
-          <div><b>Total Skor:</b> {totalScore.toFixed(2)} / 100</div>
-          <div><b>Tanggal:</b> {new Date().toLocaleDateString("id-ID",{day:"numeric",month:"long",year:"numeric"})}</div>
+        <div className="grid grid-cols-2 gap-2 text-sm border border-slate-300 rounded-xl p-4">
+          {[["No. Proposal",`#${proposal.no}`],["Fakultas",proposal.fakultas],["Nama Ketua",proposal.ketua],["NIM",proposal.nim],
+            ["Program Studi",proposal.prodi],["Reviewer",reviewer],["Posisi",`Reviewer ${slot}`],["Tanggal",today],
+            ["Total Skor",allScored?`${total.toFixed(2)} / 100`:"Belum lengkap"]].map(([k,v])=>(
+            <div key={k}><span className="text-slate-500">{k}: </span><b>{v}</b></div>
+          ))}
+          <div className="col-span-2"><span className="text-slate-500">Judul: </span><b>{proposal.judul}</b></div>
         </div>
-        {rec&&<div className="mt-3 inline-block border-2 border-slate-800 px-4 py-1 font-bold text-sm rounded">
-          REKOMENDASI: {rec.label}
-        </div>}
+        {rec&&<div className={`inline-block mt-3 ${rec.bg} text-white text-sm font-black px-5 py-2 rounded-xl`}>REKOMENDASI: {rec.icon} {rec.label}</div>}
       </div>
 
-      <main className="max-w-4xl mx-auto px-4 py-5 space-y-4">
+      <main className="max-w-3xl mx-auto px-4 py-5 space-y-4">
 
-        {/* ── INFO PROPOSAL ── */}
+        {/* Info proposal */}
         <div className="bg-blue-700 text-white rounded-2xl p-5 shadow fade-in">
-          <div className="flex items-start gap-3">
-            <div className="bg-white/20 rounded-xl p-2.5 text-xl shrink-0">📋</div>
-            <div className="flex-1 min-w-0">
-              <div className="flex gap-2 mb-2 flex-wrap">
-                <span className="bg-white/20 text-xs font-bold px-2 py-1 rounded-lg">#{proposal.no}</span>
-                <span className="bg-white/20 text-xs font-bold px-2 py-1 rounded-lg">{proposal.fakultas}</span>
-                <span className="bg-amber-400 text-amber-900 text-xs font-bold px-2 py-1 rounded-lg">Reviewer {reviewerSlot}</span>
-              </div>
-              <div className="font-bold text-base leading-snug mb-2">{proposal.judul}</div>
-              <div className="text-blue-200 text-xs space-y-0.5">
-                <div>👤 {proposal.ketua} · {proposal.nim}</div>
-                <div>🎓 {proposal.prodi}</div>
-                <div className="text-blue-100">R1: {proposal.r1} &nbsp;|&nbsp; R2: {proposal.r2}</div>
-              </div>
-            </div>
+          <div className="flex gap-2 mb-3 flex-wrap">
+            <span className="bg-white/20 text-xs font-bold px-2 py-1 rounded-lg">#{proposal.no}</span>
+            <span className="bg-white/20 text-xs font-bold px-2 py-1 rounded-lg">{proposal.fakultas}</span>
+            <span className="bg-amber-400 text-amber-900 text-xs font-bold px-2 py-1 rounded-lg">Reviewer {slot}</span>
           </div>
-        </div>
-
-        {/* ── SYARAT ADMINISTRASI ── */}
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-          <div className="flex items-start gap-3 mb-4">
-            <span className="text-2xl">📋</span>
-            <div>
-              <h2 className="font-bold text-slate-800 text-sm">Syarat Administrasi Mutlak</h2>
-              <p className="text-xs text-slate-500">Centang semua sebelum melanjutkan penilaian substansi</p>
-            </div>
+          <div className="font-bold text-base leading-snug mb-3">{proposal.judul}</div>
+          <div className="space-y-1 text-xs text-blue-100">
+            <div>👤 <b>{proposal.ketua}</b> · {proposal.nim}</div>
+            <div>🎓 {proposal.prodi}</div>
+            <div className="pt-1 border-t border-white/20 text-blue-200">R1: {proposal.r1} &nbsp;|&nbsp; R2: {proposal.r2}</div>
           </div>
-          <div className="space-y-2">
-            {SYARAT_ADMIN.map(s=>(
-              <label key={s.id} onClick={()=>setAdminChecks(p=>({...p,[s.id]:!p[s.id]}))}
-                className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all
-                  ${adminChecks[s.id]?"border-emerald-300 bg-emerald-50":"border-slate-200 hover:bg-slate-50"}`}>
-                <div className={`w-5 h-5 rounded flex items-center justify-center shrink-0 border-2 transition-all
-                  ${adminChecks[s.id]?"bg-emerald-500 border-emerald-500":"border-slate-300"}`}>
-                  {adminChecks[s.id]&&<span className="text-white text-xs font-bold">✓</span>}
-                </div>
-                <span className="text-sm text-slate-700">{s.label}</span>
-              </label>
-            ))}
-          </div>
-          {adminOk&&(
-            <div className="mt-3 flex items-center gap-2 text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 text-xs fade-in">
-              ✅ <span className="font-medium">Semua syarat administrasi terpenuhi.</span>
-            </div>
-          )}
         </div>
 
         {/* ── ANALISIS AI ── */}
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 no-print">
-          <div className="flex items-start gap-3 mb-4">
-            <span className="text-2xl">🤖</span>
-            <div>
-              <h2 className="font-bold text-slate-800 text-sm">Analisis Awal AI · Gemini</h2>
-              <p className="text-xs text-slate-500">Upload PDF proposal → AI analisis → terapkan saran ke rubrik</p>
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden no-print">
+          <button onClick={()=>setShowAI(p=>!p)}
+            className="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-50 transition-colors">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center text-xl">🤖</div>
+              <div className="text-left">
+                <div className="font-bold text-slate-800 text-sm">Analisis AI · GLM-4.7-Flash</div>
+                <div className="text-xs text-slate-400">
+                  {!apiReady ? "⚠️ API Key belum diisi" :
+                   aiResult ? "✅ Analisis selesai — klik untuk lihat" :
+                   "Upload PDF → AI analisis → terapkan ke rubrik"}
+                </div>
+              </div>
             </div>
-          </div>
+            <span className="text-slate-400 text-lg">{showAI?"▲":"▼"}</span>
+          </button>
 
-          {/* Mode tabs */}
-          <div className="flex gap-2 mb-4">
-            {[["upload","📂 Upload PDF"],["paste","📋 Tempel Teks"]].map(([m,l])=>(
-              <button key={m} onClick={()=>setInputMode(m)}
-                className={`px-3 py-2 rounded-xl text-xs font-bold transition-all
-                  ${inputMode===m?"bg-indigo-600 text-white shadow":"bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>{l}</button>
-            ))}
-          </div>
+          {showAI&&(
+            <div className="px-5 pb-5 space-y-4 border-t border-slate-100 pt-4">
+              {!apiReady&&(
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-xs text-amber-800">
+                  <div className="font-bold mb-2">🔑 Cara mengaktifkan AI (GRATIS):</div>
+                  <div className="space-y-1">
+                    <div>1. Buka <b>z.ai/model-api</b> → Sign Up (pakai Google)</div>
+                    <div>2. Buka <b>z.ai/manage-apikey/apikey-list</b> → Create API Key</div>
+                    <div>3. Copy key → buka <b>index.html</b> di Notepad</div>
+                    <div>4. Cari <code className="bg-amber-100 px-1 rounded">GANTI_DENGAN_API_KEY_ANDA</code> → paste key Anda</div>
+                    <div>5. Simpan → upload ulang ke GitHub</div>
+                  </div>
+                </div>
+              )}
 
-          {inputMode==="upload"?(
-            <div>
+              {/* Upload area */}
               <div
-                onDragOver={e=>{e.preventDefault();setIsDragging(true);}}
-                onDragLeave={()=>setIsDragging(false)}
-                onDrop={e=>{e.preventDefault();setIsDragging(false);processFile(e.dataTransfer.files[0]);}}
+                onDragOver={e=>{e.preventDefault();setIsDrag(true);}}
+                onDragLeave={()=>setIsDrag(false)}
+                onDrop={e=>{e.preventDefault();setIsDrag(false);processFile(e.dataTransfer.files[0]);}}
                 onClick={()=>!isExtracting&&fileRef.current?.click()}
-                className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all
-                  ${isDragging?"border-indigo-500 bg-indigo-50":"border-slate-300 hover:border-indigo-400 hover:bg-slate-50"}
-                  ${isExtracting?"pointer-events-none opacity-75":""}`}>
+                className={`border-2 border-dashed rounded-2xl p-5 text-center cursor-pointer transition-all
+                  ${isDrag?"border-indigo-500 bg-indigo-50":"border-slate-300 hover:border-indigo-400 hover:bg-slate-50"}
+                  ${isExtracting?"pointer-events-none opacity-70":""}`}>
                 <input ref={fileRef} type="file" accept="application/pdf" className="hidden"
                   onChange={e=>processFile(e.target.files[0])}/>
                 {isExtracting?(
                   <div className="space-y-2">
-                    <div className="text-3xl">📄</div>
+                    <div className="text-2xl">📄</div>
                     <div className="text-sm font-semibold text-indigo-700">Membaca PDF...</div>
                     <div className="text-xs text-slate-400">{fileInfo?.name}</div>
-                    <div className="w-32 mx-auto bg-slate-200 rounded-full h-1 overflow-hidden">
-                      <div className="bg-indigo-500 h-full rounded-full w-2/3 animate-pulse"/>
+                    <div className="w-32 mx-auto bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                      <div className="bg-indigo-500 h-full rounded-full animate-pulse w-2/3"/>
                     </div>
                   </div>
-                ):fileInfo&&proposalText?(
+                ):pdfText?(
                   <div className="space-y-1">
                     <div className="text-2xl">✅</div>
                     <div className="text-sm font-bold text-emerald-700">PDF berhasil dibaca!</div>
-                    <div className="text-xs text-slate-500">{fileInfo.name} · {fileInfo.size} KB</div>
+                    <div className="text-xs text-slate-500">{fileInfo?.name} · {fileInfo?.size} KB · {fileInfo?.chars?.toLocaleString()} karakter</div>
                     <div className="text-xs text-indigo-500 underline">Klik untuk ganti file</div>
                   </div>
                 ):(
                   <div className="space-y-2">
                     <div className="text-3xl">📂</div>
                     <div className="text-sm font-bold text-slate-700">Drag & drop PDF proposal di sini</div>
-                    <div className="text-xs text-slate-400">atau klik untuk pilih file · maks 20MB · hingga 40 halaman</div>
-                    {!pdfJsReady&&<div className="text-xs text-amber-500">⏳ Memuat pembaca PDF...</div>}
+                    <div className="text-xs text-slate-400">atau klik untuk pilih file · maks 20MB</div>
                   </div>
                 )}
               </div>
-              {uploadError&&<div className="mt-2 text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">❌ {uploadError}</div>}
-              {fileInfo&&proposalText&&(
-                <div className="mt-2 bg-indigo-50 border border-indigo-100 rounded-xl px-3 py-2 text-xs text-indigo-700 fade-in">
-                  📄 {fileInfo.totalPages} halaman · {fileInfo.chars?.toLocaleString()} karakter diekstrak
-                  <div className="mt-1 text-slate-400 font-mono truncate">{proposalText.substring(0,120)}...</div>
-                </div>
-              )}
-            </div>
-          ):(
-            <textarea value={proposalText} onChange={e=>setProposalText(e.target.value)}
-              placeholder="Tempel teks proposal di sini..."
-              rows={5} className="w-full text-sm border border-slate-200 rounded-xl px-3 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-y"/>
-          )}
+              {pdfError&&<div className="text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">❌ {pdfError}</div>}
 
-          <div className="flex flex-wrap gap-2 mt-3">
-            <button onClick={analyze} disabled={isAnalyzing||!proposalText.trim()}
-              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-all">
-              {isAnalyzing?(
-                <><svg className="spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.4 0 0 5.4 0 12h4z"/>
-                </svg>Menganalisis...</>
-              ):<>🔍 Analisis dengan Gemini AI</>}
-            </button>
-            {aiAnalysis&&!aiApplied&&(
-              <button onClick={applyAI}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-all">
-                ⬇️ Terapkan ke Rubrik
-              </button>
-            )}
-            {aiApplied&&(
-              <div className="self-center text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-2 rounded-lg">
-                ✅ Saran AI diterapkan — Anda bisa mengubah nilai
+              {/* Tombol Analisis */}
+              <div className="flex flex-wrap gap-2 items-center">
+                <button onClick={doAnalyze}
+                  disabled={isAnalyzing||!pdfText||!apiReady}
+                  className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white text-sm font-bold px-5 py-2.5 rounded-xl transition-all">
+                  {isAnalyzing?(
+                    <><svg className="spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.4 0 0 5.4 0 12h4z"/>
+                    </svg>Menganalisis...</>
+                  ):<>🔍 Analisis dengan AI</>}
+                </button>
+                {aiResult&&!aiApplied&&(
+                  <button onClick={applyAI}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold px-5 py-2.5 rounded-xl transition-all">
+                    ⬇️ Terapkan ke Rubrik
+                  </button>
+                )}
+                {aiApplied&&(
+                  <div className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-2 rounded-lg font-semibold">
+                    ✅ Skor AI diterapkan — Anda bisa mengubah
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-          {aiError&&<div className="mt-2 text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2">❌ {aiError}</div>}
+              {aiError&&<div className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2">❌ {aiError}</div>}
 
-          {aiAnalysis&&(
-            <div className="mt-4 space-y-3 fade-in">
-              <div className="text-xs font-bold text-indigo-700">📊 Hasil Analisis AI</div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
-                  <div className="text-xs font-bold text-emerald-700 mb-1.5">✅ Kekuatan</div>
-                  {(aiAnalysis.kekuatan||[]).map((k,i)=>
-                    <div key={i} className="text-xs text-emerald-800 flex gap-1.5 mb-1"><span>•</span>{k}</div>
-                  )}
-                </div>
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
-                  <div className="text-xs font-bold text-amber-700 mb-1.5">⚠️ Kelemahan</div>
-                  {(aiAnalysis.kelemahan||[]).map((k,i)=>
-                    <div key={i} className="text-xs text-amber-800 flex gap-1.5 mb-1"><span>•</span>{k}</div>
-                  )}
-                </div>
-              </div>
-              {aiAnalysis.catatan_umum&&(
-                <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3 text-xs text-indigo-800">
-                  <b>🤖 Catatan AI:</b> {aiAnalysis.catatan_umum}
-                </div>
-              )}
-              <div className="grid grid-cols-3 gap-2">
-                {RUBRIK.map(r=>{
-                  const a=aiAnalysis[r.id];
-                  if(!a)return null;
-                  return(
-                    <div key={r.id} className="bg-white border border-slate-200 rounded-xl p-2.5">
-                      <div className="text-xs font-bold text-slate-600 mb-1">{r.icon} {r.aspek.split("&")[0].trim()}</div>
-                      <div className={`text-sm font-black ${a.skor>=75?"text-emerald-600":a.skor>=50?"text-amber-600":"text-rose-600"}`}>
-                        {a.skor}
-                      </div>
-                      <div className="text-xs text-slate-400 mt-0.5 line-clamp-2">{a.alasan}</div>
+              {/* Hasil AI */}
+              {aiResult&&(
+                <div className="space-y-3 fade-in">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+                      <div className="text-xs font-bold text-emerald-700 mb-2">✅ Kekuatan</div>
+                      {(aiResult.kekuatan||[]).map((k,i)=>(
+                        <div key={i} className="text-xs text-emerald-800 flex gap-1.5 mb-1"><span>•</span><span>{k}</span></div>
+                      ))}
                     </div>
-                  );
-                })}
-              </div>
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+                      <div className="text-xs font-bold text-amber-700 mb-2">⚠️ Kelemahan</div>
+                      {(aiResult.kelemahan||[]).map((k,i)=>(
+                        <div key={i} className="text-xs text-amber-800 flex gap-1.5 mb-1"><span>•</span><span>{k}</span></div>
+                      ))}
+                    </div>
+                  </div>
+                  {aiResult.ringkasan&&(
+                    <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3 text-xs text-indigo-800">
+                      <b>🤖 Ringkasan AI:</b> {aiResult.ringkasan}
+                    </div>
+                  )}
+                  <div className="grid grid-cols-3 gap-2">
+                    {RUBRIK.map(r=>{
+                      const a=aiResult[r.id];
+                      if(!a)return null;
+                      return(
+                        <div key={r.id} className="bg-white border border-slate-200 rounded-xl p-2.5">
+                          <div className="text-xs font-bold text-slate-500 mb-1">{r.icon} {r.aspek.split("&")[0].split("/")[0].trim()}</div>
+                          <div className={`text-lg font-black ${a.skor>=75?"text-emerald-600":a.skor>=50?"text-amber-600":"text-rose-600"}`}>{a.skor}</div>
+                          <div className="text-xs text-slate-400 mt-0.5 line-clamp-2">{a.alasan}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
 
+        {/* ── SYARAT ADMIN ── */}
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-xl">📋</div>
+            <div className="flex-1">
+              <h2 className="font-bold text-slate-800 text-sm">A. Kelengkapan Administrasi</h2>
+              <p className="text-xs text-slate-400">Wajib semua tercentang sebelum menilai substansi</p>
+            </div>
+            {adminOk&&<span className="text-xs font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-lg shrink-0">✓ Lengkap</span>}
+          </div>
+          <div className="space-y-2">
+            {SYARAT_ADMIN.map(s=>(
+              <label key={s.id} onClick={()=>setAdminChecks(p=>({...p,[s.id]:!p[s.id]}))}
+                className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer select-none transition-all
+                  ${adminChecks[s.id]?"border-emerald-300 bg-emerald-50":"border-slate-100 hover:border-slate-300"}`}>
+                <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-all
+                  ${adminChecks[s.id]?"bg-emerald-500 border-emerald-500":"border-slate-300"}`}>
+                  {adminChecks[s.id]&&<span className="text-white text-xs">✓</span>}
+                </div>
+                <span className="text-sm text-slate-700">{s.label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
         {/* ── RUBRIK ── */}
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-          <div className="flex items-start gap-3 mb-4">
-            <span className="text-2xl">📊</span>
-            <div>
-              <h2 className="font-bold text-slate-800 text-sm">Rubrik Penilaian Substansi</h2>
-              <p className="text-xs text-slate-500">{aiAnalysis?"Ikon 🤖 = saran AI · ":""}Pilih satu skor per kriteria</p>
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-xl">📊</div>
+            <div className="flex-1">
+              <h2 className="font-bold text-slate-800 text-sm">B. Penilaian Substansi</h2>
+              <p className="text-xs text-slate-400">{aiResult?"🤖 = saran AI · ":""}Pilih satu skor per kriteria</p>
+            </div>
+            <div className="text-right shrink-0">
+              <div className="text-xl font-black text-slate-800">{allScored?total.toFixed(1):`${scored}/${RUBRIK.length}`}</div>
+              <div className="text-xs text-slate-400">{allScored?"skor":"dinilai"}</div>
             </div>
           </div>
-          <div className="space-y-3">
-            {RUBRIK.map(r=>{
-              const aiRec=aiAnalysis?.[r.id];
+
+          <div className="space-y-4">
+            {RUBRIK.map((r,i)=>{
+              const val=scores[r.id];
+              const aiRec=aiResult?.[r.id];
+              const weighted=val!==undefined?((val/100)*r.bobot):null;
               return(
-                <div key={r.id} className="border border-slate-200 rounded-xl overflow-hidden">
-                  <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg">{r.icon}</span>
-                      <div>
-                        <div className="font-semibold text-slate-800 text-sm">{r.aspek}</div>
-                        <div className="text-xs text-slate-400">{r.deskripsi}</div>
+                <div key={r.id} className={`rounded-xl border-2 overflow-hidden transition-all ${val!==undefined?"border-blue-200":"border-slate-200"}`}>
+                  <div className={`px-4 py-3 flex items-center justify-between ${val!==undefined?"bg-blue-50":"bg-slate-50"}`}>
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <span className="text-xl shrink-0">{r.icon}</span>
+                      <div className="min-w-0">
+                        <div className="font-bold text-slate-800 text-sm">{i+1}. {r.aspek}</div>
+                        <button onClick={()=>setOpenGuide(openGuide===r.id?null:r.id)}
+                          className="text-xs text-blue-500 hover:text-blue-700">
+                          {openGuide===r.id?"▲ Tutup":"▼ Panduan penilaian"}
+                        </button>
                       </div>
                     </div>
-                    <div className="flex gap-2 shrink-0 ml-2">
-                      <span className="text-xs font-bold bg-blue-100 text-blue-700 border border-blue-200 px-2 py-1 rounded-full">
-                        {r.bobot}%
-                      </span>
-                      {scores[r.id]!==undefined&&(
-                        <span className={`text-xs font-bold px-2 py-1 rounded-full border
-                          ${scores[r.id]>=75?"bg-emerald-100 text-emerald-700 border-emerald-200":
-                            scores[r.id]>=50?"bg-amber-100 text-amber-700 border-amber-200":
-                            "bg-rose-100 text-rose-700 border-rose-200"}`}>
-                          {((scores[r.id]/100)*r.bobot).toFixed(1)}
+                    <div className="flex gap-2 items-center shrink-0 ml-2">
+                      <span className="text-xs font-bold bg-blue-100 text-blue-700 px-2 py-1 rounded-full">Bobot {r.bobot}%</span>
+                      {weighted!==null&&(
+                        <span className={`text-xs font-black px-2 py-1 rounded-full
+                          ${val>=75?"bg-emerald-100 text-emerald-700":val>=50?"bg-amber-100 text-amber-700":"bg-rose-100 text-rose-700"}`}>
+                          {weighted.toFixed(2)} poin
                         </span>
                       )}
                     </div>
                   </div>
+                  {openGuide===r.id&&(
+                    <div className="px-4 py-2 bg-sky-50 border-b border-sky-100 text-xs text-sky-800 fade-in">
+                      📖 <b>Panduan:</b> {r.panduan}
+                    </div>
+                  )}
                   {aiRec&&(
                     <div className="px-4 py-2 bg-indigo-50 border-b border-indigo-100 flex items-center gap-2 flex-wrap">
-                      <span className="text-xs text-indigo-500 shrink-0">🤖 Saran AI:</span>
+                      <span className="text-xs text-indigo-400 shrink-0">🤖 Saran AI:</span>
                       <span className="text-xs text-indigo-700 flex-1">{aiRec.alasan}</span>
-                      <span className="text-xs font-bold bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full shrink-0">→ {aiRec.skor}</span>
+                      <span className="text-xs font-bold bg-indigo-200 text-indigo-800 px-2 py-0.5 rounded-full shrink-0">→ {aiRec.skor}</span>
                     </div>
                   )}
                   <div className="grid grid-cols-2">
-                    {r.opsi.map(op=>{
-                      const sel=scores[r.id]===op.skor;
-                      const isAI=aiRec&&aiRec.skor===op.skor;
+                    {r.opsi.map((op,oi)=>{
+                      const sel=val===op.skor;
+                      const isAI=aiRec?.skor===op.skor;
                       return(
                         <button key={op.skor} onClick={()=>setScores(p=>({...p,[r.id]:op.skor}))}
-                          className={`text-left p-3 transition-all hover:bg-slate-50 relative border-t border-l border-slate-100
-                            ${sel?"bg-blue-50 border-l-4 border-l-blue-500":"bg-white"}`}>
-                          {isAI&&!sel&&<span className="absolute top-1 right-1 text-xs text-indigo-400">🤖</span>}
+                          className={`text-left p-3 transition-all relative border-t border-slate-100
+                            ${oi%2===1?"border-l":""}
+                            ${sel?"bg-blue-50 border-l-4 border-l-blue-600":"bg-white hover:bg-slate-50"}`}>
+                          {isAI&&!sel&&<span className="absolute top-1 right-1 text-xs opacity-50">🤖</span>}
                           <div className="flex items-center gap-2 mb-1">
                             <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0
-                              ${sel?"border-blue-500 bg-blue-500":"border-slate-300"}`}>
-                              {sel&&<div className="w-2 h-2 rounded-full bg-white"/>}
+                              ${sel?"border-blue-600 bg-blue-600":"border-slate-300"}`}>
+                              {sel&&<div className="w-1.5 h-1.5 rounded-full bg-white"/>}
                             </div>
-                            <span className={`text-xs font-bold
-                              ${op.skor===100?"text-emerald-700":op.skor===75?"text-blue-700":
-                                op.skor===50?"text-amber-700":"text-rose-700"}`}>
+                            <span className={`text-xs font-black
+                              ${op.skor===100?"text-emerald-700":op.skor===75?"text-blue-700":op.skor===50?"text-amber-700":"text-rose-700"}`}>
                               {op.skor} — {op.label}
                             </span>
                           </div>
@@ -715,88 +701,103 @@ Jawab HANYA JSON valid tanpa markdown:
         {/* ── RINGKASAN SKOR ── */}
         {allScored&&rec&&(
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 fade-in">
-            <div className="flex items-start gap-3 mb-4">
-              <span className="text-2xl">🏆</span>
-              <h2 className="font-bold text-slate-800 text-sm mt-1">Ringkasan Skor</h2>
-            </div>
-            <div className="space-y-2 mb-4">
+            <h2 className="font-bold text-slate-800 text-sm flex items-center gap-2 mb-4"><span className="text-xl">🏆</span> C. Ringkasan Skor</h2>
+            <div className="space-y-2 mb-5">
               {RUBRIK.map(r=>{
                 const s=scores[r.id];
-                const w=s!==undefined?(s/100)*r.bobot:0;
+                const w=(s/100)*r.bobot;
                 return(
-                  <div key={r.id} className="flex items-center gap-2 text-xs">
-                    <span>{r.icon}</span>
-                    <span className="flex-1 text-slate-600 truncate">{r.aspek}</span>
-                    <span className="text-slate-400">{s}×{r.bobot}%=</span>
-                    <span className={`font-bold w-10 text-right
-                      ${w>=r.bobot*0.75?"text-emerald-600":w>=r.bobot*0.5?"text-amber-600":"text-rose-600"}`}>
-                      {w.toFixed(2)}
-                    </span>
+                  <div key={r.id} className="flex items-center gap-2">
+                    <span className="w-6 text-base">{r.icon}</span>
+                    <span className="flex-1 text-xs text-slate-600 truncate">{r.aspek}</span>
+                    <div className="w-20 bg-slate-100 rounded-full h-1.5 hidden sm:block shrink-0">
+                      <div className={`h-1.5 rounded-full ${s>=75?"bg-emerald-500":s>=50?"bg-amber-500":"bg-rose-500"}`} style={{width:`${s}%`}}/>
+                    </div>
+                    <span className="text-xs text-slate-400 w-16 text-right shrink-0">{s}×{r.bobot}%</span>
+                    <span className={`text-xs font-black w-12 text-right shrink-0 ${w>=r.bobot*.75?"text-emerald-600":w>=r.bobot*.5?"text-amber-600":"text-rose-600"}`}>{w.toFixed(2)}</span>
                   </div>
                 );
               })}
+              <div className="border-t pt-2 flex justify-between text-sm font-bold">
+                <span>Total Skor</span><span className="text-blue-700">{total.toFixed(2)} / 100</span>
+              </div>
             </div>
-            <div className={`${rec.bg} text-white rounded-2xl p-5 text-center`}>
-              <div className="text-5xl font-black mb-1">{totalScore.toFixed(2)}</div>
-              <div className="text-sm opacity-80 mb-2">dari 100 poin</div>
-              <div className="text-base font-bold tracking-wide">{rec.label}</div>
+            <div className={`${rec.bg} text-white rounded-2xl p-5 text-center ring-4 ${rec.ring} ring-opacity-30`}>
+              <div className="text-5xl font-black mb-1">{total.toFixed(2)}</div>
+              <div className="text-sm opacity-75 mb-1">dari 100 poin</div>
+              <div className="text-lg font-black tracking-wide">{rec.icon} {rec.label}</div>
+              <div className="text-xs opacity-75 mt-1">
+                {total>=75?"Proposal memenuhi ambang batas kelulusan P2MW.":
+                 total>=55?"Proposal memerlukan perbaikan substansial sebelum dapat diterima.":
+                 "Proposal belum memenuhi standar minimum P2MW 2026."}
+              </div>
             </div>
           </div>
         )}
 
         {/* ── CATATAN ── */}
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-          <div className="flex items-start gap-3 mb-4">
-            <span className="text-2xl">📝</span>
-            <h2 className="font-bold text-slate-800 text-sm mt-1">Catatan & Saran Perbaikan</h2>
-          </div>
+          <h2 className="font-bold text-slate-800 text-sm flex items-center gap-2 mb-4"><span className="text-xl">📝</span> D. Catatan Reviewer</h2>
           <div className="space-y-3">
             <div>
-              <label className="text-xs font-semibold text-slate-500 block mb-1">Komentar Reviewer</label>
-              <textarea value={komentar} onChange={e=>setKomentar(e.target.value)} rows={3}
-                placeholder="Catatan umum, kelebihan, atau hal yang perlu diperhatikan..."
+              <label className="text-xs font-semibold text-slate-500 block mb-1.5">Komentar & Penilaian Umum</label>
+              <textarea value={komentar} onChange={e=>setKomentar(e.target.value)} rows={4}
+                placeholder="Tuliskan catatan umum, kelebihan utama proposal, dan hal-hal yang perlu diperhatikan..."
                 className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none"/>
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-500 block mb-1">Saran Perbaikan</label>
-              <textarea value={saran} onChange={e=>setSaran(e.target.value)} rows={3}
-                placeholder="Saran konkret yang harus ditindaklanjuti tim..."
+              <label className="text-xs font-semibold text-slate-500 block mb-1.5">Saran Perbaikan</label>
+              <textarea value={saran} onChange={e=>setSaran(e.target.value)} rows={4}
+                placeholder="Tuliskan saran konkret yang harus ditindaklanjuti tim pengusul..."
                 className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none"/>
             </div>
           </div>
         </div>
 
-        {/* PRINT-ONLY catatan */}
-        <div className="hidden print:block mt-4 space-y-4">
-          <div><div className="font-bold text-sm border-b pb-1 mb-2">Komentar Reviewer:</div>
-            <div className="text-sm min-h-16 whitespace-pre-wrap">{komentar||"—"}</div></div>
-          <div><div className="font-bold text-sm border-b pb-1 mb-2">Saran Perbaikan:</div>
-            <div className="text-sm min-h-16 whitespace-pre-wrap">{saran||"—"}</div></div>
-          <div className="grid grid-cols-2 gap-8 mt-8">
-            <div><div className="text-xs text-slate-400 mb-10">Tanda tangan:</div>
-              <div className="border-t border-slate-400 pt-1 text-sm font-semibold">{reviewerName}</div></div>
-            <div><div className="text-xs text-slate-400 mb-10">Tanggal:</div>
-              <div className="border-t border-slate-400 pt-1 text-sm">
-                {new Date().toLocaleDateString("id-ID",{day:"numeric",month:"long",year:"numeric"})}</div></div>
+        {/* Print-only catatan & TTD */}
+        <div className="hidden print:block space-y-5">
+          <div className="border border-slate-300 rounded-xl p-4">
+            <div className="font-bold text-sm mb-2 border-b pb-1">Komentar & Penilaian Umum:</div>
+            <div className="text-sm min-h-20 whitespace-pre-wrap">{komentar||"—"}</div>
+          </div>
+          <div className="border border-slate-300 rounded-xl p-4">
+            <div className="font-bold text-sm mb-2 border-b pb-1">Saran Perbaikan:</div>
+            <div className="text-sm min-h-20 whitespace-pre-wrap">{saran||"—"}</div>
+          </div>
+          <div className="grid grid-cols-2 gap-16 mt-10 text-sm">
+            <div>
+              <div className="text-slate-400 text-xs mb-16">Tanda tangan Reviewer:</div>
+              <div className="border-t-2 border-slate-700 pt-2">
+                <div className="font-bold">{reviewer}</div>
+                <div className="text-xs text-slate-500">Reviewer {slot}</div>
+              </div>
+            </div>
+            <div>
+              <div className="text-slate-400 text-xs mb-16">Tanggal:</div>
+              <div className="border-t-2 border-slate-700 pt-2">
+                <div className="font-semibold">{today}</div>
+                <div className="text-xs text-slate-500">Semarang</div>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* ── TOMBOL AKSI ── */}
-        <div className="flex flex-wrap gap-3 pb-16 no-print">
-          <button onClick={()=>{if(allScored)window.print();}}
-            disabled={!allScored||!reviewerName}
-            className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 disabled:opacity-40 text-white text-sm font-bold px-6 py-3 rounded-xl transition-all shadow">
-            🖨️ Cetak / Simpan PDF
-          </button>
-          {allScored&&(
-            <button onClick={handleComplete}
-              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold px-6 py-3 rounded-xl transition-all shadow">
-              ✅ Tandai Selesai & Kembali
-            </button>
-          )}
-          {!allScored&&(
-            <div className="self-center text-xs text-amber-700 bg-amber-50 border border-amber-200 px-3 py-2 rounded-lg">
-              ⚠ {RUBRIK.length-scoredCount} kriteria belum dinilai
+        {/* Tombol aksi */}
+        <div className="no-print pb-20 flex flex-wrap gap-3 items-center">
+          {allScored?(
+            <>
+              <button onClick={()=>window.print()}
+                className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white font-bold px-6 py-3 rounded-xl text-sm shadow transition-all">
+                🖨️ Cetak / Simpan PDF
+              </button>
+              <button onClick={()=>{onDone(proposal.no);}}
+                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-3 rounded-xl text-sm shadow transition-all">
+                ✅ Tandai Selesai & Kembali
+              </button>
+            </>
+          ):(
+            <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold px-4 py-3 rounded-xl">
+              ⚠️ Masih ada {RUBRIK.length-scored} kriteria yang belum dinilai
             </div>
           )}
         </div>
@@ -806,42 +807,32 @@ Jawab HANYA JSON valid tanpa markdown:
 }
 
 // ══════════════════════════════════════
-//  ROOT APP
+//  ROOT
 // ══════════════════════════════════════
 function App(){
   const [screen,setScreen]=useState("login");
   const [reviewer,setReviewer]=useState("");
-  const [selectedProposal,setSelectedProposal]=useState(null);
-  const [reviewerSlot,setReviewerSlot]=useState(1);
-  const [completedNos,setCompletedNos]=useState(()=>{
-    try{const s=sessionStorage.getItem("p2mw_done");return s?new Set(JSON.parse(s)):new Set();}
+  const [cur,setCur]=useState(null);
+  const [slot,setSlot]=useState(1);
+  const [doneSet,setDoneSet]=useState(()=>{
+    try{const v=sessionStorage.getItem("p2mw26_done");return v?new Set(JSON.parse(v)):new Set();}
     catch{return new Set();}
   });
 
   const markDone=(no)=>{
-    setCompletedNos(prev=>{
+    setDoneSet(prev=>{
       const n=new Set(prev);n.add(no);
-      sessionStorage.setItem("p2mw_done",JSON.stringify([...n]));
+      try{sessionStorage.setItem("p2mw26_done",JSON.stringify([...n]));}catch{}
       return n;
     });
-    setScreen("dashboard");
+    setScreen("dashboard");window.scrollTo(0,0);
   };
 
-  if(screen==="login")
-    return <LoginScreen onLogin={name=>{setReviewer(name);setScreen("dashboard");}}/>;
-
-  if(screen==="review"&&selectedProposal)
-    return <ReviewScreen
-      proposal={selectedProposal}
-      reviewerName={reviewer}
-      reviewerSlot={reviewerSlot}
-      onBack={()=>setScreen("dashboard")}
-      onComplete={markDone}/>;
-
-  return <DashboardScreen
-    reviewer={reviewer}
-    completedNos={completedNos}
-    onSelectProposal={(p,slot)=>{setSelectedProposal(p);setReviewerSlot(slot);setScreen("review");}}
+  if(screen==="login") return <LoginScreen onLogin={n=>{setReviewer(n);setScreen("dashboard");}}/>;
+  if(screen==="review"&&cur) return <ReviewScreen proposal={cur} reviewer={reviewer} slot={slot}
+    onBack={()=>{setScreen("dashboard");window.scrollTo(0,0);}} onDone={markDone}/>;
+  return <DashboardScreen reviewer={reviewer} doneSet={doneSet}
+    onSelect={(p,s)=>{setCur(p);setSlot(s);setScreen("review");window.scrollTo(0,0);}}
     onLogout={()=>{setReviewer("");setScreen("login");}}/>;
 }
 
