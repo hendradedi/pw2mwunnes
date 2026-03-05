@@ -32,10 +32,6 @@ const { useState, useRef, useEffect, useCallback } = React;
 // ║  ⚙️  KONFIGURASI — GANTI API KEY DI SINI            ║
 // ╚══════════════════════════════════════════════════════╝
 const ZAI_API_KEY = "fd3e4aa6b95749509ad981fcfc41e90c.BlG2Ehm7CPmvCSTk";
-//  Cara dapat API key GRATIS:
-//  1. Buka https://z.ai/model-api → Sign Up (pakai Google)
-//  2. Buka https://z.ai/manage-apikey/apikey-list
-//  3. Klik "Create API Key" → copy → paste di atas
 const ZAI_MODEL   = "glm-4.7-flash"; // GRATIS ✓
 const ZAI_URL     = "https://api.z.ai/api/paas/v4/chat/completions";
 // ═══════════════════════════════════════════════════════
@@ -339,51 +335,85 @@ function ReviewScreen({proposal, reviewer, slot, onBack, onDone}){
     if(!pdfText.trim()){setAiError("Upload PDF terlebih dahulu.");return;}
     if(!apiReady){setAiError("API Key belum diisi di file index.html.");return;}
     setIsAnalyzing(true);setAiError("");setAiResult(null);
-    const prompt=`Anda adalah evaluator proposal P2MW UNNES 2026 yang berpengalaman dan objektif. Evaluasi proposal berikut secara kritis.
 
-Judul: "${proposal.judul}"
-Pengusul: ${proposal.ketua} | ${proposal.prodi} | ${proposal.fakultas}
+    const teks = pdfText.substring(0,8000);
+    const prompt =
+`Evaluasi proposal P2MW UNNES 2026 berikut. Berikan skor 100, 75, 50, atau 25 untuk setiap kriteria.
+
+Judul: ${proposal.judul}
+Pengusul: ${proposal.ketua} (${proposal.fakultas})
 
 TEKS PROPOSAL:
----
-${pdfText.substring(0,9000)}
----
+${teks}
 
-Evaluasi 6 kriteria P2MW 2026. Pilih SATU skor: 100, 75, 50, atau 25.
-q1 - Latar Belakang & Tujuan Mulia (bobot 15%): urgensi masalah, dampak sosial
-q2 - Segmen Pelanggan & Potensi Pasar (bobot 20%): kejelasan target, validasi, data pasar
-q3 - Inovasi / Keunikan Produk (bobot 20%): orisinalitas, keunggulan kompetitif
-q4 - Strategi Pemasaran & Distribusi (bobot 20%): kelengkapan, distribusi, proyeksi
-q5 - SDM / Tim (bobot 15%): komposisi, kompetensi, relevansi
-q6 - RAB (bobot 10%): kewajaran, ketaatan ketentuan P2MW
-
-Jika informasi tidak cukup untuk menilai suatu kriteria, beri skor 50 dengan alasan "informasi tidak cukup dalam teks yang tersedia."
-Berikan alasan spesifik 2-3 kalimat per kriteria berdasarkan isi proposal.
-
-PENTING: Jawab HANYA dengan JSON valid, tanpa markdown, tanpa penjelasan lain:
-{"q1":{"skor":75,"alasan":"..."},"q2":{"skor":50,"alasan":"..."},"q3":{"skor":75,"alasan":"..."},"q4":{"skor":50,"alasan":"..."},"q5":{"skor":75,"alasan":"..."},"q6":{"skor":75,"alasan":"..."},"kekuatan":["...","..."],"kelemahan":["...","..."],"ringkasan":"2-3 kalimat penilaian umum."}`;
+Balas HANYA dengan JSON ini (tanpa teks lain, tanpa markdown):
+{"q1":{"skor":75,"alasan":"alasan singkat"},"q2":{"skor":75,"alasan":"alasan singkat"},"q3":{"skor":75,"alasan":"alasan singkat"},"q4":{"skor":50,"alasan":"alasan singkat"},"q5":{"skor":75,"alasan":"alasan singkat"},"q6":{"skor":75,"alasan":"alasan singkat"},"kekuatan":["kelebihan 1","kelebihan 2"],"kelemahan":["kelemahan 1","kelemahan 2"],"ringkasan":"penilaian umum 2-3 kalimat"}`;
 
     try{
       const res=await fetch(ZAI_URL,{
         method:"POST",
         headers:{"Content-Type":"application/json","Authorization":`Bearer ${ZAI_API_KEY}`},
-        body:JSON.stringify({model:ZAI_MODEL,messages:[{role:"user",content:prompt}],
-          temperature:0.1,max_tokens:1500})
+        body:JSON.stringify({
+          model:ZAI_MODEL,
+          messages:[
+            {role:"system",content:"Kamu adalah evaluator proposal wirausaha mahasiswa. Jawab HANYA dengan JSON valid sesuai format yang diminta, tanpa penjelasan tambahan."},
+            {role:"user",content:prompt}
+          ],
+          temperature:0.1,
+          max_tokens:1200
+        })
       });
+
       if(!res.ok){
-        const e=await res.json().catch(()=>({}));
-        const msg=e?.error?.message||`HTTP ${res.status}`;
-        if(res.status===401||res.status===403)throw new Error("API Key tidak valid. Pastikan sudah diisi dengan benar.");
-        throw new Error(msg);
+        let errMsg=`HTTP Error ${res.status}`;
+        try{const e=await res.json();errMsg=e?.error?.message||errMsg;}catch{}
+        if(res.status===401||res.status===403)errMsg="API Key tidak valid atau kedaluwarsa.";
+        if(res.status===429)errMsg="Terlalu banyak permintaan. Tunggu sebentar lalu coba lagi.";
+        throw new Error(errMsg);
       }
+
       const data=await res.json();
-      const raw=data?.choices?.[0]?.message?.content||"";
-      if(!raw)throw new Error("Respons AI kosong. Coba lagi.");
-      const clean=raw.replace(/```json|```/g,"").trim();
+
+      // Cek semua kemungkinan struktur respons
+      let raw="";
+      if(data?.choices?.[0]?.message?.content) raw=data.choices[0].message.content;
+      else if(data?.content?.[0]?.text) raw=data.content[0].text;
+      else if(typeof data?.choices?.[0]?.text==="string") raw=data.choices[0].text;
+
+      if(!raw||raw.trim()===""){
+        // Log respons asli untuk debug
+        console.error("Respons API kosong. Data lengkap:",JSON.stringify(data));
+        throw new Error(`Respons AI kosong. Struktur data: ${Object.keys(data||{}).join(", ")}`);
+      }
+
+      // Bersihkan markdown fences
+      let clean=raw.replace(/```json\s*/gi,"").replace(/```\s*/g,"").trim();
+
+      // Cari blok JSON
       const j=clean.indexOf("{"),k=clean.lastIndexOf("}");
-      if(j<0||k<0)throw new Error("Format JSON tidak valid dari AI.");
-      setAiResult(JSON.parse(clean.slice(j,k+1)));
-    }catch(e){setAiError(e.message);}
+      if(j<0||k<0){
+        console.error("Tidak ada JSON. Raw:",raw);
+        throw new Error("AI tidak mengembalikan JSON. Coba lagi.");
+      }
+      const jsonStr=clean.slice(j,k+1);
+
+      let parsed;
+      try{parsed=JSON.parse(jsonStr);}
+      catch(pe){
+        console.error("JSON parse error:",pe.message,"String:",jsonStr.substring(0,200));
+        throw new Error("Format JSON dari AI tidak valid. Coba lagi.");
+      }
+
+      // Validasi minimal
+      if(!parsed.q1||!parsed.q2){
+        throw new Error("Respons AI tidak lengkap. Coba lagi.");
+      }
+
+      setAiResult(parsed);
+    }catch(e){
+      console.error("AI Error:",e);
+      setAiError(e.message);
+    }
     finally{setIsAnalyzing(false);}
   };
 
