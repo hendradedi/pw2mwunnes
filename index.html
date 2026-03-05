@@ -1162,14 +1162,17 @@ Balas HANYA JSON (tanpa markdown):
 
         {/* Tombol aksi */}
         <div className="no-print pb-20 flex flex-wrap gap-3 items-center">
+          <button onClick={onBack}
+            className="flex items-center gap-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold px-6 py-3 rounded-xl text-sm shadow transition-all">
+            ← Kembali
+          </button>
           {allScored?(
             <>
               <button onClick={()=>window.print()}
                 className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white font-bold px-6 py-3 rounded-xl text-sm shadow transition-all">
                 🖨️ Cetak / Simpan PDF
               </button>
-
-                          <button onClick={()=>{
+              <button onClick={()=>{
                 onDone(proposal.no,{
                   proposal, reviewer, slot,
                   scores:{...scores},
