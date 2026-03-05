@@ -582,11 +582,38 @@ function DashboardScreen({reviewer, onSelect, onLogout, doneSet, onAdmin}){
 //  SCREEN 3 — FORM PENILAIAN
 // ══════════════════════════════════════
 function ReviewScreen({proposal, reviewer, slot, onBack, onDone}){
-  const [adminChecks,setAdminChecks]=useState({});
-  const [scores,setScores]=useState({});
-  const [komentar,setKomentar]=useState("");
-  const [saran,setSaran]=useState("");
+  const storageKey = "p2mw26_review_"+proposal.no+"_"+slot;
+  const [adminChecks,setAdminChecks]=useState(()=>{
+    try{const v=localStorage.getItem(storageKey+"_admin");return v?JSON.parse(v):{};}
+    catch{return {};}
+  });
+  const [scores,setScores]=useState(()=>{
+    try{const v=localStorage.getItem(storageKey+"_scores");return v?JSON.parse(v):{};}
+    catch{return {};}
+  });
+  const [komentar,setKomentar]=useState(()=>{
+    try{return localStorage.getItem(storageKey+"_komentar")||"";}
+    catch{return "";}
+  });
+  const [saran,setSaran]=useState(()=>{
+    try{return localStorage.getItem(storageKey+"_saran")||"";}
+    catch{return "";}
+  });
   const [openGuide,setOpenGuide]=useState(null);
+
+  // Auto-save ke localStorage setiap perubahan
+  React.useEffect(()=>{
+    try{localStorage.setItem(storageKey+"_scores",JSON.stringify(scores));}catch{}
+  },[scores]);
+  React.useEffect(()=>{
+    try{localStorage.setItem(storageKey+"_admin",JSON.stringify(adminChecks));}catch{}
+  },[adminChecks]);
+  React.useEffect(()=>{
+    try{localStorage.setItem(storageKey+"_komentar",komentar);}catch{}
+  },[komentar]);
+  React.useEffect(()=>{
+    try{localStorage.setItem(storageKey+"_saran",saran);}catch{}
+  },[saran]);
 
   // AI state
   const [pdfText,setPdfText]=useState("");
@@ -1215,7 +1242,19 @@ function App(){
     catch{return [];}
   });
   const [doneSet,setDoneSet]=useState(()=>{
-    try{const v=localStorage.getItem("p2mw26_done");return v?new Set(JSON.parse(v)):new Set();}
+    try{
+      const v=localStorage.getItem("p2mw26_done");
+      const fromDone = v?new Set(JSON.parse(v)):new Set();
+      // Fallback: populate dari allReviews jika ada
+      const rv=localStorage.getItem("p2mw26_reviews");
+      if(rv){
+        const reviews=JSON.parse(rv);
+        reviews.filter(r=>r.done).forEach(r=>{
+          fromDone.add(r.proposal.no+"-"+r.slot);
+        });
+      }
+      return fromDone;
+    }
     catch{return new Set();}
   });
 
