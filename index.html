@@ -32,7 +32,7 @@ const { useState, useRef, useEffect, useCallback } = React;
 // ║  ⚙️  KONFIGURASI — GANTI API KEY DI SINI            ║
 // ╚══════════════════════════════════════════════════════╝
 const ZAI_API_KEY = "fd3e4aa6b95749509ad981fcfc41e90c.BlG2Ehm7CPmvCSTk";
-const ZAI_MODEL   = "glm-4.7-flash"; // GRATIS ✓
+const ZAI_MODEL   = "glm-4-flash-250414"; // GRATIS ✓
 const ZAI_URL     = "https://api.z.ai/api/paas/v4/chat/completions";
 // ═══════════════════════════════════════════════════════
 
@@ -140,7 +140,7 @@ function LoginScreen({onLogin}){
           ${apiReady?"bg-emerald-50 border border-emerald-200 text-emerald-700":"bg-amber-50 border border-amber-200 text-amber-700"}`}>
           <span className="text-base">{apiReady?"🤖":"⚠️"}</span>
           {apiReady
-            ? <span>Analisis AI <b>GLM-4.7-Flash</b> siap digunakan</span>
+            ? <span>Analisis AI <b>GLM-4-Flash</b> siap digunakan</span>
             : <span>API Key belum diisi — mode manual aktif. <br/>Edit baris <code className="bg-amber-100 px-1 rounded">ZAI_API_KEY</code> di index.html</span>
           }
         </div>
@@ -353,7 +353,7 @@ Balas HANYA JSON (tanpa markdown):
         signal:ctrl.signal,
         headers:{"Content-Type":"application/json","Authorization":`Bearer ${ZAI_API_KEY}`},
         body:JSON.stringify({
-          model:"glm-4-flash",
+          model:"glm-4-flash-250414",
           messages:[
             {role:"system",content:"Kamu adalah evaluator proposal. Jawab HANYA dengan JSON valid sesuai format, tanpa kalimat pembuka atau penutup."},
             {role:"user",content:prompt}
@@ -512,7 +512,7 @@ Balas HANYA JSON (tanpa markdown):
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center text-xl">🤖</div>
               <div className="text-left">
-                <div className="font-bold text-slate-800 text-sm">Analisis AI · GLM-4.7-Flash</div>
+                <div className="font-bold text-slate-800 text-sm">Analisis AI · GLM-4-Flash</div>
                 <div className="text-xs text-slate-400">
                   {!apiReady ? "⚠️ API Key belum diisi" :
                    aiResult ? "✅ Analisis selesai — klik untuk lihat" :
