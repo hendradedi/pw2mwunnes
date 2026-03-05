@@ -9,6 +9,7 @@
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
   <style>
     body{font-family:'Plus Jakarta Sans',sans-serif;}
@@ -121,6 +122,302 @@ async function extractPDF(file){
 // ══════════════════════════════════════
 //  SCREEN 1 — LOGIN
 // ══════════════════════════════════════
+
+// ── EXPORT EXCEL ──────────────────────────────────────────────────
+function exportExcel(allReviews){
+  const rows = [];
+  const WEIGHTS = {q1:0.15,q2:0.20,q3:0.20,q4:0.20,q5:0.15,q6:0.10};
+  const LABELS  = {q1:"Latar Belakang",q2:"Segmen Pasar",q3:"Inovasi",q4:"Pemasaran",q5:"SDM",q6:"RAB"};
+
+  allReviews.forEach(({proposal,reviewer,slot,scores,notes,done,ts})=>{
+    if(!done) return;
+    const total = Object.entries(WEIGHTS).reduce((s,[k,w])=>s+(scores[k]||0)*w,0);
+    const rek = total>=75?"Lolos":total>=55?"Revisi Mayor":"Tidak Direkomendasikan";
+    const row = {
+      "No": proposal.no,
+      "Judul": proposal.judul,
+      "Ketua": proposal.ketua,
+      "NIM": proposal.nim,
+      "Prodi": proposal.prodi,
+      "Fakultas": proposal.fakultas,
+      "Reviewer": reviewer,
+      "Slot": slot===1?"Reviewer 1":"Reviewer 2",
+      "Latar Belakang (15%)": scores.q1||0,
+      "Segmen Pasar (20%)": scores.q2||0,
+      "Inovasi (20%)": scores.q3||0,
+      "Pemasaran (20%)": scores.q4||0,
+      "SDM (15%)": scores.q5||0,
+      "RAB (10%)": scores.q6||0,
+      "Total Skor": Math.round(total*10)/10,
+      "Rekomendasi": rek,
+      "Komentar": notes?.komentar||"",
+      "Saran": notes?.saran||"",
+      "Waktu Penilaian": ts||""
+    };
+    rows.push(row);
+  });
+
+  if(rows.length===0){alert("Belum ada penilaian yang selesai untuk diekspor.");return;}
+
+  const ws = XLSX.utils.json_to_sheet(rows);
+  // Column widths
+  ws["!cols"] = [
+    {wch:5},{wch:50},{wch:25},{wch:15},{wch:30},{wch:10},
+    {wch:35},{wch:12},{wch:18},{wch:18},{wch:14},{wch:16},
+    {wch:12},{wch:10},{wch:12},{wch:18},{wch:40},{wch:40},{wch:20}
+  ];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Rekap Penilaian P2MW");
+
+  // Sheet 2: Rekap per proposal (rata-rata 2 reviewer)
+  const byProposal = {};
+  rows.forEach(r=>{
+    const k = r["No"];
+    if(!byProposal[k]) byProposal[k]={...r,count:0,totalSum:0,scores:[]};
+    byProposal[k].count++;
+    byProposal[k].totalSum+=r["Total Skor"];
+    byProposal[k].scores.push(r["Total Skor"]);
+  });
+  const rows2 = Object.values(byProposal).map(p=>({
+    "No": p["No"],
+    "Judul": p["Judul"],
+    "Ketua": p["Ketua"],
+    "Fakultas": p["Fakultas"],
+    "Jumlah Reviewer Selesai": p.count,
+    "Rata-rata Skor": p.count>0?Math.round(p.totalSum/p.count*10)/10:0,
+    "Rekomendasi Akhir": (()=>{const avg=p.totalSum/p.count;return avg>=75?"Lolos":avg>=55?"Revisi Mayor":"Tidak Direkomendasikan";})()
+  })).sort((a,b)=>b["Rata-rata Skor"]-a["Rata-rata Skor"]);
+  const ws2 = XLSX.utils.json_to_sheet(rows2);
+  ws2["!cols"]=[{wch:5},{wch:50},{wch:25},{wch:10},{wch:22},{wch:15},{wch:20}];
+  XLSX.utils.book_append_sheet(wb, ws2, "Rekap per Proposal");
+
+  XLSX.writeFile(wb, `Rekap_P2MW_UNNES_2026_${new Date().toLocaleDateString('id-ID').replace(/\//g,'-')}.xlsx`);
+}
+
+// ── ADMIN DASHBOARD ───────────────────────────────────────────────
+function AdminDashboard({onClose, allReviews}){
+  const [tab,setTab]=React.useState("overview");
+  const [filterFak,setFilterFak]=React.useState("Semua");
+
+  const WEIGHTS={q1:0.15,q2:0.20,q3:0.20,q4:0.20,q5:0.15,q6:0.10};
+  const doneReviews = allReviews.filter(r=>r.done);
+  const totalProposals = PROPOSALS_DATA.length;
+  const uniqueDone = new Set(doneReviews.map(r=>r.proposal.no+"-"+r.slot)).size;
+  const totalSlots = totalProposals * 2;
+  const pct = Math.round(uniqueDone/totalSlots*100);
+
+  // Progress per reviewer
+  const reviewerStats = {};
+  PROPOSALS_DATA.forEach(p=>{
+    [p.r1,p.r2].forEach((r,i)=>{
+      if(!reviewerStats[r]) reviewerStats[r]={name:r,total:0,done:0};
+      reviewerStats[r].total++;
+    });
+  });
+  doneReviews.forEach(r=>{
+    if(reviewerStats[r.reviewer]) reviewerStats[r.reviewer].done++;
+  });
+
+  // Proposal scores
+  const proposalScores = {};
+  doneReviews.forEach(r=>{
+    const total=Object.entries(WEIGHTS).reduce((s,[k,w])=>s+(r.scores[k]||0)*w,0);
+    if(!proposalScores[r.proposal.no]) proposalScores[r.proposal.no]={...r.proposal,scores:[],total:0,count:0};
+    proposalScores[r.proposal.no].scores.push(total);
+    proposalScores[r.proposal.no].total+=total;
+    proposalScores[r.proposal.no].count++;
+  });
+  const scoredList = Object.values(proposalScores)
+    .map(p=>({...p,avg:p.total/p.count}))
+    .sort((a,b)=>b.avg-a.avg);
+
+  const fakultasList=["Semua",...new Set(PROPOSALS_DATA.map(p=>p.fakultas))];
+  const filtered = scoredList.filter(p=>filterFak==="Semua"||p.fakultas===filterFak);
+
+  const lolos=scoredList.filter(p=>p.count>=2&&p.avg>=75).length;
+  const revisi=scoredList.filter(p=>p.count>=2&&p.avg>=55&&p.avg<75).length;
+  const tidak=scoredList.filter(p=>p.count>=2&&p.avg<55).length;
+
+  return(
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 overflow-auto">
+      <div className="min-h-screen p-4">
+        <div className="max-w-6xl mx-auto bg-white rounded-2xl shadow-2xl overflow-hidden">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-6 text-white">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl font-bold">📊 Dashboard Admin P2MW UNNES 2026</h1>
+                <p className="text-indigo-200 text-sm mt-1">Monitor progress penilaian seluruh reviewer</p>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={()=>exportExcel(allReviews)}
+                  className="bg-green-500 hover:bg-green-400 text-white px-4 py-2 rounded-xl font-semibold text-sm flex items-center gap-2">
+                  📥 Export Excel
+                </button>
+                <button onClick={onClose} className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-xl text-sm font-semibold">✕ Tutup</button>
+              </div>
+            </div>
+            {/* Stats row */}
+            <div className="grid grid-cols-4 gap-4 mt-6">
+              {[
+                {label:"Total Proposal",val:totalProposals,icon:"📄"},
+                {label:"Sudah Dinilai",val:`${uniqueDone}/${totalSlots}`,icon:"✅"},
+                {label:"Progress",val:`${pct}%`,icon:"📈"},
+                {label:"Reviewer Aktif",val:Object.values(reviewerStats).filter(r=>r.done>0).length,icon:"👥"},
+              ].map(s=>(
+                <div key={s.label} className="bg-white/15 rounded-xl p-3 text-center">
+                  <div className="text-2xl">{s.icon}</div>
+                  <div className="text-xl font-bold">{s.val}</div>
+                  <div className="text-indigo-200 text-xs">{s.label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Tabs */}
+          <div className="border-b flex">
+            {[["overview","📊 Overview"],["reviewer","👥 Per Reviewer"],["proposals","📋 Rekap Proposal"]].map(([k,l])=>(
+              <button key={k} onClick={()=>setTab(k)}
+                className={`px-6 py-3 text-sm font-semibold border-b-2 transition-colors ${tab===k?"border-indigo-500 text-indigo-600":"border-transparent text-slate-500 hover:text-slate-700"}`}>
+                {l}
+              </button>
+            ))}
+          </div>
+
+          <div className="p-6">
+            {/* OVERVIEW TAB */}
+            {tab==="overview" && (
+              <div className="space-y-6">
+                {/* Progress bar */}
+                <div>
+                  <div className="flex justify-between text-sm mb-2">
+                    <span className="font-semibold text-slate-700">Progress Keseluruhan</span>
+                    <span className="text-indigo-600 font-bold">{pct}%</span>
+                  </div>
+                  <div className="w-full bg-slate-100 rounded-full h-4">
+                    <div className="bg-gradient-to-r from-indigo-500 to-purple-500 h-4 rounded-full transition-all" style={{width:`${pct}%`}}/>
+                  </div>
+                </div>
+                {/* Rekomendasi summary */}
+                <div className="grid grid-cols-3 gap-4">
+                  {[
+                    {label:"Lolos",val:lolos,color:"bg-emerald-50 border-emerald-200 text-emerald-700",icon:"✅"},
+                    {label:"Revisi Mayor",val:revisi,color:"bg-amber-50 border-amber-200 text-amber-700",icon:"⚠️"},
+                    {label:"Tidak Lolos",val:tidak,color:"bg-rose-50 border-rose-200 text-rose-700",icon:"❌"},
+                  ].map(s=>(
+                    <div key={s.label} className={`border rounded-xl p-4 ${s.color} text-center`}>
+                      <div className="text-3xl">{s.icon}</div>
+                      <div className="text-3xl font-bold">{s.val}</div>
+                      <div className="text-sm font-semibold">{s.label}</div>
+                      <div className="text-xs opacity-70">(sudah 2 reviewer)</div>
+                    </div>
+                  ))}
+                </div>
+                {/* Per Fakultas */}
+                <div>
+                  <h3 className="font-semibold text-slate-700 mb-3">Progress per Fakultas</h3>
+                  <div className="space-y-2">
+                    {[...new Set(PROPOSALS_DATA.map(p=>p.fakultas))].map(fak=>{
+                      const total=PROPOSALS_DATA.filter(p=>p.fakultas===fak).length;
+                      const done=doneReviews.filter(r=>r.proposal.fakultas===fak).length;
+                      const p=Math.round(done/(total*2)*100);
+                      return(
+                        <div key={fak} className="flex items-center gap-3">
+                          <div className="w-20 text-xs font-semibold text-slate-600 text-right">{fak}</div>
+                          <div className="flex-1 bg-slate-100 rounded-full h-3">
+                            <div className="bg-indigo-400 h-3 rounded-full" style={{width:`${p}%`}}/>
+                          </div>
+                          <div className="w-20 text-xs text-slate-500">{done}/{total*2} ({p}%)</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* REVIEWER TAB */}
+            {tab==="reviewer" && (
+              <div className="space-y-3">
+                {Object.values(reviewerStats).sort((a,b)=>b.done-a.done).map(r=>{
+                  const p=Math.round(r.done/r.total*100);
+                  return(
+                    <div key={r.name} className="bg-slate-50 rounded-xl p-4 flex items-center gap-4">
+                      <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-sm">
+                        {r.name[0]}
+                      </div>
+                      <div className="flex-1">
+                        <div className="font-semibold text-slate-800 text-sm">{r.name}</div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <div className="flex-1 bg-slate-200 rounded-full h-2">
+                            <div className={`h-2 rounded-full ${p===100?"bg-emerald-500":p>50?"bg-indigo-500":"bg-amber-400"}`} style={{width:`${p}%`}}/>
+                          </div>
+                          <span className="text-xs text-slate-500 w-20">{r.done}/{r.total} ({p}%)</span>
+                        </div>
+                      </div>
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${p===100?"bg-emerald-100 text-emerald-700":p>50?"bg-indigo-100 text-indigo-700":"bg-amber-100 text-amber-700"}`}>
+                        {p===100?"✅ Selesai":p>50?"🔄 Dalam proses":"⏳ Baru mulai"}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* PROPOSALS TAB */}
+            {tab==="proposals" && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <select value={filterFak} onChange={e=>setFilterFak(e.target.value)}
+                    className="border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                    {fakultasList.map(f=><option key={f}>{f}</option>)}
+                  </select>
+                  <span className="text-sm text-slate-500">{filtered.length} proposal</span>
+                </div>
+                <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+                  {filtered.map((p,i)=>{
+                    const rek=p.count<2?"Menunggu":p.avg>=75?"Lolos":p.avg>=55?"Revisi Mayor":"Tidak Lolos";
+                    const col=p.count<2?"bg-slate-50 border-slate-200":p.avg>=75?"bg-emerald-50 border-emerald-200":p.avg>=55?"bg-amber-50 border-amber-200":"bg-rose-50 border-rose-200";
+                    const tc=p.count<2?"text-slate-500":p.avg>=75?"text-emerald-700":p.avg>=55?"text-amber-700":"text-rose-700";
+                    return(
+                      <div key={p.no} className={`border rounded-xl p-3 ${col} flex items-center gap-3`}>
+                        <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-xs font-bold text-slate-500 border">{p.no}</div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold text-slate-800 text-sm truncate">{p.judul}</div>
+                          <div className="text-xs text-slate-500">{p.ketua} · {p.fakultas}</div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          {p.count>0&&<div className="text-lg font-bold text-slate-700">{Math.round(p.avg*10)/10}</div>}
+                          <div className={`text-xs font-semibold ${tc}`}>{rek}</div>
+                          <div className="text-xs text-slate-400">{p.count}/2 reviewer</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {/* Proposal belum dinilai */}
+                  {PROPOSALS_DATA.filter(p=>!proposalScores[p.no]).filter(p=>filterFak==="Semua"||p.fakultas===filterFak).map(p=>(
+                    <div key={p.no} className="border border-slate-200 rounded-xl p-3 bg-slate-50 flex items-center gap-3 opacity-60">
+                      <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-xs font-bold text-slate-400 border">{p.no}</div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-slate-600 text-sm truncate">{p.judul}</div>
+                        <div className="text-xs text-slate-400">{p.ketua} · {p.fakultas}</div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className="text-xs font-semibold text-slate-400">Belum dinilai</div>
+                        <div className="text-xs text-slate-300">0/2 reviewer</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function LoginScreen({onLogin}){
   const [name,setName]=useState("");
   const myCount = name ? PROPOSALS_DATA.filter(p=>p.r1===name||p.r2===name).length : 0;
@@ -181,7 +478,7 @@ function LoginScreen({onLogin}){
 // ══════════════════════════════════════
 //  SCREEN 2 — DASHBOARD
 // ══════════════════════════════════════
-function DashboardScreen({reviewer, onSelect, onLogout, doneSet}){
+function DashboardScreen({reviewer, onSelect, onLogout, doneSet, onAdmin}){
   const proposals = PROPOSALS_DATA.filter(p=>p.r1===reviewer||p.r2===reviewer);
   const done = proposals.filter(p=>doneSet.has(p.no)).length;
   const [search,setSearch]=useState("");
@@ -208,7 +505,10 @@ function DashboardScreen({reviewer, onSelect, onLogout, doneSet}){
             <div className="text-right shrink-0">
               <div className="text-3xl font-black">{done}<span className="text-blue-300 text-xl">/{proposals.length}</span></div>
               <div className="text-xs text-blue-200">selesai dinilai</div>
-              <button onClick={onLogout} className="mt-1 text-xs text-blue-300 hover:text-white underline">Ganti</button>
+              <div className="flex gap-2 mt-1">
+                <button onClick={onAdmin} className="text-xs bg-white/20 hover:bg-white/30 text-white px-2 py-1 rounded-lg font-semibold">📊 Admin</button>
+                <button onClick={onLogout} className="text-xs text-blue-300 hover:text-white underline">Ganti</button>
+              </div>
             </div>
           </div>
           <div className="mt-3">
@@ -298,6 +598,8 @@ function ReviewScreen({proposal, reviewer, slot, onBack, onDone}){
   const [aiApplied,setAiApplied]=useState(false);
   const [debugInfo,setDebugInfo]=useState("");
   const [showAI,setShowAI]=useState(true);
+  const [showPDF,setShowPDF]=useState(false);
+  const [pdfUrl,setPdfUrl]=useState(null);
   const fileRef=useRef();
 
   const scored = RUBRIK.filter(r=>scores[r.id]!==undefined).length;
@@ -322,6 +624,9 @@ function ReviewScreen({proposal, reviewer, slot, onBack, onDone}){
     if(file.size>20*1024*1024){setPdfError("Maks 20 MB.");return;}
     setPdfError("");setIsExtracting(true);
     setFileInfo({name:file.name,size:(file.size/1024).toFixed(0)});
+    // Buat URL untuk preview PDF
+    if(pdfUrl) URL.revokeObjectURL(pdfUrl);
+    setPdfUrl(URL.createObjectURL(file));
     try{
       const{text,totalPages,extractedPages}=await extractPDF(file);
       if(!text||text.length<50){setPdfError("PDF tidak bisa dibaca (kemungkinan scan/gambar).");setIsExtracting(false);return;}
@@ -329,7 +634,7 @@ function ReviewScreen({proposal, reviewer, slot, onBack, onDone}){
       setFileInfo(f=>({...f,totalPages,extractedPages,chars:text.length}));
     }catch(e){setPdfError("Gagal baca PDF: "+e.message);}
     finally{setIsExtracting(false);}
-  },[]);
+  },[pdfUrl]);
 
   // AI Analysis
   const doAnalyze=async()=>{
@@ -563,7 +868,11 @@ Balas HANYA JSON (tanpa markdown):
                     <div className="text-2xl">✅</div>
                     <div className="text-sm font-bold text-emerald-700">PDF berhasil dibaca!</div>
                     <div className="text-xs text-slate-500">{fileInfo?.name} · {fileInfo?.size} KB · {fileInfo?.chars?.toLocaleString()} karakter</div>
-                    <div className="text-xs text-indigo-500 underline">Klik untuk ganti file</div>
+                    <div className="flex items-center justify-center gap-3 mt-1">
+                      <button onClick={()=>setShowPDF(true)} className="text-xs text-blue-600 font-semibold underline hover:text-blue-800">👁 Lihat PDF</button>
+                      <span className="text-slate-300">|</span>
+                      <button onClick={()=>fileRef.current.click()} className="text-xs text-indigo-500 underline">Ganti file</button>
+                    </div>
                   </div>
                 ):(
                   <div className="space-y-2">
@@ -850,7 +1159,31 @@ Balas HANYA JSON (tanpa markdown):
                 className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white font-bold px-6 py-3 rounded-xl text-sm shadow transition-all">
                 🖨️ Cetak / Simpan PDF
               </button>
-              <button onClick={()=>{onDone(proposal.no);}}
+            {/* PDF VIEWER MODAL */}
+            {showPDF&&pdfUrl&&(
+              <div className="fixed inset-0 bg-black/80 z-50 flex flex-col">
+                <div className="bg-white px-4 py-3 flex items-center justify-between shrink-0">
+                  <div>
+                    <span className="font-bold text-slate-800 text-sm">📄 {fileInfo?.name}</span>
+                    <span className="text-xs text-slate-400 ml-2">{fileInfo?.size} KB</span>
+                  </div>
+                  <button onClick={()=>setShowPDF(false)}
+                    className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg font-semibold text-sm">
+                    ✕ Tutup
+                  </button>
+                </div>
+                <iframe src={pdfUrl} className="flex-1 w-full border-0" title="PDF Preview"/>
+              </div>
+            )}
+                          <button onClick={()=>{
+                onDone(proposal.no,{
+                  proposal, reviewer, slot,
+                  scores:{...scores},
+                  notes:{komentar:notes.komentar||"",saran:notes.saran||""},
+                  done:true,
+                  ts:new Date().toLocaleString("id-ID")
+                });
+              }}
                 className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-3 rounded-xl text-sm shadow transition-all">
                 ✅ Tandai Selesai & Kembali
               </button>
@@ -874,26 +1207,42 @@ function App(){
   const [reviewer,setReviewer]=useState("");
   const [cur,setCur]=useState(null);
   const [slot,setSlot]=useState(1);
+  const [showAdmin,setShowAdmin]=useState(false);
+  const [allReviews,setAllReviews]=useState(()=>{
+    try{const v=sessionStorage.getItem("p2mw26_reviews");return v?JSON.parse(v):[];}
+    catch{return [];}
+  });
   const [doneSet,setDoneSet]=useState(()=>{
     try{const v=sessionStorage.getItem("p2mw26_done");return v?new Set(JSON.parse(v)):new Set();}
     catch{return new Set();}
   });
 
-  const markDone=(no)=>{
+  const markDone=(no, reviewData)=>{
     setDoneSet(prev=>{
       const n=new Set(prev);n.add(no);
       try{sessionStorage.setItem("p2mw26_done",JSON.stringify([...n]));}catch{}
       return n;
     });
+    if(reviewData){
+      setAllReviews(prev=>{
+        const updated=[...prev.filter(r=>!(r.proposal?.no===reviewData.proposal?.no&&r.slot===reviewData.slot)),reviewData];
+        try{sessionStorage.setItem("p2mw26_reviews",JSON.stringify(updated));}catch{}
+        return updated;
+      });
+    }
     setScreen("dashboard");window.scrollTo(0,0);
   };
 
   if(screen==="login") return <LoginScreen onLogin={n=>{setReviewer(n);setScreen("dashboard");}}/>;
   if(screen==="review"&&cur) return <ReviewScreen proposal={cur} reviewer={reviewer} slot={slot}
     onBack={()=>{setScreen("dashboard");window.scrollTo(0,0);}} onDone={markDone}/>;
-  return <DashboardScreen reviewer={reviewer} doneSet={doneSet}
-    onSelect={(p,s)=>{setCur(p);setSlot(s);setScreen("review");window.scrollTo(0,0);}}
-    onLogout={()=>{setReviewer("");setScreen("login");}}/>;
+  return <>
+    <DashboardScreen reviewer={reviewer} doneSet={doneSet}
+      onSelect={(p,s)=>{setCur(p);setSlot(s);setScreen("review");window.scrollTo(0,0);}}
+      onLogout={()=>{setReviewer("");setScreen("login");}}
+      onAdmin={()=>setShowAdmin(true)}/>
+    {showAdmin&&<AdminDashboard allReviews={allReviews} onClose={()=>setShowAdmin(false)}/>}
+  </>;
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
