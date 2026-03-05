@@ -1209,24 +1209,24 @@ function App(){
   const [slot,setSlot]=useState(1);
   const [showAdmin,setShowAdmin]=useState(false);
   const [allReviews,setAllReviews]=useState(()=>{
-    try{const v=sessionStorage.getItem("p2mw26_reviews");return v?JSON.parse(v):[];}
+    try{const v=localStorage.getItem("p2mw26_reviews");return v?JSON.parse(v):[];}
     catch{return [];}
   });
   const [doneSet,setDoneSet]=useState(()=>{
-    try{const v=sessionStorage.getItem("p2mw26_done");return v?new Set(JSON.parse(v)):new Set();}
+    try{const v=localStorage.getItem("p2mw26_done");return v?new Set(JSON.parse(v)):new Set();}
     catch{return new Set();}
   });
 
   const markDone=(no, reviewData)=>{
     setDoneSet(prev=>{
       const n=new Set(prev);n.add(no);
-      try{sessionStorage.setItem("p2mw26_done",JSON.stringify([...n]));}catch{}
+      try{localStorage.setItem("p2mw26_done",JSON.stringify([...n]));}catch{}
       return n;
     });
     if(reviewData){
       setAllReviews(prev=>{
         const updated=[...prev.filter(r=>!(r.proposal?.no===reviewData.proposal?.no&&r.slot===reviewData.slot)),reviewData];
-        try{sessionStorage.setItem("p2mw26_reviews",JSON.stringify(updated));}catch{}
+        try{localStorage.setItem("p2mw26_reviews",JSON.stringify(updated));}catch{}
         return updated;
       });
     }
