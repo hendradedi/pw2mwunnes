@@ -1166,30 +1166,33 @@ Balas HANYA JSON (tanpa markdown):
             className="flex items-center gap-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold px-6 py-3 rounded-xl text-sm shadow transition-all">
             ← Kembali
           </button>
-          {allScored?(
-            <>
-              <button onClick={()=>window.print()}
-                className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white font-bold px-6 py-3 rounded-xl text-sm shadow transition-all">
-                🖨️ Cetak / Simpan PDF
-              </button>
-              <button onClick={()=>{
-                onDone(proposal.no,{
-                  proposal, reviewer, slot,
-                  scores:{...scores},
-                  notes:{komentar:notes.komentar||"",saran:notes.saran||""},
-                  done:true,
-                  ts:new Date().toLocaleString("id-ID")
-                });
-              }}
-                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-3 rounded-xl text-sm shadow transition-all">
-                ✅ Tandai Selesai & Kembali
-              </button>
-            </>
-          ):(
+          <button onClick={()=>window.print()}
+            className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white font-bold px-6 py-3 rounded-xl text-sm shadow transition-all">
+            🖨️ Cetak / Simpan PDF
+          </button>
+          {!allScored&&(
             <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold px-4 py-3 rounded-xl">
-              ⚠️ Masih ada {RUBRIK.length-scored} kriteria yang belum dinilai
+              ⚠️ {RUBRIK.length-scored} kriteria belum dinilai — tombol simpan aktif setelah semua diisi
             </div>
           )}
+          <button
+            onClick={()=>{
+              if(!allScored){
+                alert("Mohon isi semua "+RUBRIK.length+" kriteria rubrik terlebih dahulu sebelum menyimpan.");
+                return;
+              }
+              onDone(proposal.no,{
+                proposal, reviewer, slot,
+                scores:{...scores},
+                notes:{komentar:notes.komentar||"",saran:notes.saran||""},
+                done:true,
+                ts:new Date().toLocaleString("id-ID")
+              });
+            }}
+            className={`flex items-center gap-2 font-bold px-6 py-3 rounded-xl text-sm shadow transition-all text-white
+              ${allScored?"bg-emerald-600 hover:bg-emerald-700":"bg-slate-400 cursor-not-allowed"}`}>
+            ✅ Tandai Selesai & Kembali {!allScored&&`(${scored}/${RUBRIK.length})`}
+          </button>
         </div>
       </main>
     </div>
