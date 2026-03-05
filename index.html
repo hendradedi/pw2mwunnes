@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Penilaian Cerdas P2MW 2026</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- Load PDF.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        
+        @media print {
+            body { background-color: white; }
+            .no-print { display: none !important; }
+            .print-break { page-break-before: always; }
+            .shadow-md { box-shadow: none !important; border: 1px solid #e5e7eb; }
+        }
+
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 4px solid #ffffff;
+            width: 24px;
+            height: 24px;
+            -webkit-animation: spin 1s linear infinite; /* Safari */
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="text-gray-800 antialiased p-4 md:p-8">
+
+    <div class="max-w-5xl mx-auto space-y-6">
+        
+        <!-- Header -->
+        <header class="bg-blue-800 text-white rounded-xl p-6 shadow-md flex items-center justify-between">
+            <div>
+                <div class="flex items-center gap-3 mb-2">
+                    <h1 class="text-2xl md:text-3xl font-bold">Penilaian Proposal P2MW 2026</h1>
+                    <span class="bg-blue-600 text-xs py-1 px-2 rounded-lg font-semibold uppercase tracking-wider border border-blue-400">AI Assisted</span>
+                </div>
+                <p class="text-blue-200">Sistem akan membaca proposal dan memberikan draf nilai untuk diverifikasi.</p>
+            </div>
+            <div class="hidden md:block text-5xl opacity-80">
+                <i class="fas fa-robot"></i>
+            </div>
+        </header>
+
+        <!-- Area Unggah Dokumen -->
+        <div class="bg-gradient-to-r from-indigo-50 to-blue-50 p-6 rounded-xl shadow-md border border-blue-100 no-print">
+            <h2 class="text-lg font-bold mb-4 text-indigo-800"><i class="fas fa-upload mr-2"></i> Tahap 1: Analisis AI (Opsional)</h2>
+            <p class="text-sm text-gray-600 mb-4">Unggah file proposal PDF untuk dianalisis otomatis oleh sistem. Sistem akan memberikan <b>draf penilaian awal</b> yang wajib Anda verifikasi ulang.</p>
+            
+            <div class="flex flex-col md:flex-row items-center gap-4">
+                <input type="file" id="pdfUpload" accept="application/pdf" class="block w-full text-sm text-gray-500
+                    file:mr-4 file:py-2.5 file:px-4
+                    file:rounded-full file:border-0
+                    file:text-sm file:font-semibold
+                    file:bg-indigo-50 file:text-indigo-700
+                    hover:file:bg-indigo-100 cursor-pointer border border-gray-300 rounded-full bg-white
+                "/>
+                <button type="button" id="analyzeBtn" onclick="processPDF()" class="w-full md:w-auto px-6 py-2.5 bg-indigo-600 rounded-full text-white hover:bg-indigo-700 font-medium shadow flex items-center justify-center transition whitespace-nowrap">
+                    <i class="fas fa-magic mr-2"></i> Analisis Proposal
+                </button>
+            </div>
+            <div id="loadingStatus" class="hidden mt-4 items-center gap-3 text-indigo-700 font-medium text-sm bg-indigo-100 p-3 rounded-lg">
+                <div class="spinner border-indigo-500 border-top-indigo-800"></div>
+                <span id="loadingText">Sistem sedang membaca dokumen...</span>
+            </div>
+        </div>
+
+        <form id="evaluationForm" class="space-y-6">
+            
+            <!-- Identitas Reviewer & Proposal -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Identitas Pembina -->
+                <div class="bg-white p-6 rounded-xl shadow-md">
+                    <h2 class="text-lg font-bold border-b pb-2 mb-4 text-gray-700">Tahap 2: Identitas Pembina</h2>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Nama Pembina / Reviewer</label>
+                            <select id="reviewerName" class="w-full border-gray-300 border rounded-lg p-2.5 focus:ring-blue-500 focus:border-blue-500" required>
+                                <option value="">-- Pilih Nama Pembina --</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Tanggal Verifikasi</label>
+                            <input type="date" id="evalDate" class="w-full border-gray-300 border rounded-lg p-2.5" required>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Identitas Proposal -->
+                <div class="bg-white p-6 rounded-xl shadow-md border-t-4 border-t-blue-500">
+                    <h2 class="text-lg font-bold border-b pb-2 mb-4 text-gray-700">Identitas Proposal</h2>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Judul Proposal Usaha</label>
+                            <textarea id="proposalTitle" rows="2" class="w-full border-gray-300 border rounded-lg p-2.5" placeholder="Masukkan judul proposal atau tunggu hasil analisis AI..." required></textarea>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Kategori Usaha</label>
+                            <select id="kategori" class="w-full border-gray-300 border rounded-lg p-2.5" required>
+                                <option value="">-- Pilih Kategori --</option>
+                                <option value="Makanan dan Minuman">Makanan dan Minuman</option>
+                                <option value="Budidaya">Budidaya</option>
+                                <option value="Industri Kreatif, Seni, dan Budaya">Industri Kreatif, Seni, dan Budaya</option>
+                                <option value="Jasa dan Perdagangan">Jasa dan Perdagangan</option>
+                                <option value="Manufaktur dan Teknologi Terapan">Manufaktur dan Teknologi Terapan</option>
+                                <option value="Bisnis Digital">Bisnis Digital</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Syarat Administrasi Mutlak -->
+            <div class="bg-white p-6 rounded-xl shadow-md border-l-4 border-yellow-500 relative">
+                <div class="absolute top-4 right-4 text-xs font-bold text-yellow-600 bg-yellow-100 px-2 py-1 rounded no-print">Verifikasi Manual Wajib</div>
+                <h2 class="text-lg font-bold mb-4 text-gray-700"><i class="fas fa-exclamation-triangle text-yellow-500 mr-2"></i> Pengecekan Administrasi</h2>
+                <p class="text-sm text-gray-500 mb-4">Pastikan administrasi ini diverifikasi secara manual meskipun menggunakan AI.</p>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <label class="flex items-center space-x-3 p-3 border rounded hover:bg-gray-50 cursor-pointer">
+                        <input type="checkbox" class="form-checkbox h-5 w-5 text-blue-600 admin-check">
+                        <span class="text-sm font-medium">Format proposal sesuai panduan (margin, font, dll)</span>
+                    </label>
+                    <label class="flex items-center space-x-3 p-3 border rounded hover:bg-gray-50 cursor-pointer">
+                        <input type="checkbox" class="form-checkbox h-5 w-5 text-blue-600 admin-check">
+                        <span class="text-sm font-medium">Tanda tangan ketua & dosen pendamping lengkap</span>
+                    </label>
+                    <label class="flex items-center space-x-3 p-3 border rounded hover:bg-gray-50 cursor-pointer">
+                        <input type="checkbox" class="form-checkbox h-5 w-5 text-blue-600 admin-check">
+                        <span class="text-sm font-medium">Biodata tim dan dosen pembimbing dilampirkan</span>
+                    </label>
+                    <label class="flex items-center space-x-3 p-3 border rounded hover:bg-gray-50 cursor-pointer">
+                        <input type="checkbox" class="form-checkbox h-5 w-5 text-blue-600 admin-check">
+                        <span class="text-sm font-medium">Anggota tim masih berstatus mahasiswa aktif</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Rubrik Penilaian -->
+            <div class="bg-white p-6 rounded-xl shadow-md relative">
+                <div class="absolute top-4 right-4 text-xs font-bold text-indigo-600 bg-indigo-100 px-2 py-1 rounded no-print">Area Verifikasi AI</div>
+                <div class="flex justify-between items-center border-b pb-2 mb-4">
+                    <h2 class="text-lg font-bold text-gray-700">Tahap 3: Verifikasi Substansi</h2>
+                    <span class="text-sm bg-blue-100 text-blue-800 py-1 px-3 rounded-full font-semibold">Total Bobot: 100%</span>
+                </div>
+                
+                <div class="space-y-8" id="rubricContainer">
+                    <!-- JavaScript akan memuat pertanyaan rubrik di sini -->
+                </div>
+            </div>
+
+            <!-- Komentar dan Saran -->
+            <div class="bg-white p-6 rounded-xl shadow-md">
+                <h2 class="text-lg font-bold border-b pb-2 mb-4 text-gray-700">Catatan & Rekomendasi Pembina</h2>
+                <textarea id="feedback" rows="5" class="w-full border-gray-300 border rounded-lg p-3 focus:ring-blue-500 focus:border-blue-500" placeholder="Berikan catatan perbaikan, kritik, atau saran untuk proposal ini... (AI akan mengisi area ini jika digunakan)"></textarea>
+            </div>
+
+            <!-- Hasil Penilaian Akhir -->
+            <div class="bg-gray-800 text-white p-6 rounded-xl shadow-md flex flex-col md:flex-row justify-between items-center">
+                <div class="mb-4 md:mb-0 text-center md:text-left">
+                    <h2 class="text-xl font-bold">Skor Akhir Proposal</h2>
+                    <p class="text-gray-400 text-sm">Diakumulasi otomatis berdasarkan bobot rubrik</p>
+                    <div id="statusBadge" class="mt-2 inline-block px-4 py-1 rounded-full text-sm font-bold bg-gray-600 text-white">
+                        Menunggu Penilaian...
+                    </div>
+                </div>
+                <div class="text-center">
+                    <div class="text-5xl font-black" id="totalScoreDisplay">0.00</div>
+                    <div class="text-sm text-gray-400">dari maksimal 100</div>
+                </div>
+            </div>
+
+            <!-- Aksi -->
+            <div class="flex gap-4 justify-end no-print">
+                <button type="button" onclick="window.location.reload()" class="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium">Reset Formulir</button>
+                <button type="button" onclick="window.print()" class="px-6 py-2 bg-blue-600 rounded-lg text-white hover:bg-blue-700 font-medium shadow"><i class="fas fa-print mr-2"></i> Konfirmasi & Cetak PDF</button>
+            </div>
+
+        </form>
+    </div>
+
+    <!-- Modal Message Box (Pengganti Alert) -->
+    <div id="messageModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center no-print">
+        <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 mx-4 transform transition-all scale-95 opacity-0" id="messageModalContent">
+            <div class="text-center">
+                <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 mb-4" id="modalIconContainer">
+                    <i class="fas fa-info-circle text-blue-600 text-xl" id="modalIcon"></i>
+                </div>
+                <h3 class="text-lg leading-6 font-bold text-gray-900" id="modalTitle">Informasi</h3>
+                <div class="mt-2">
+                    <p class="text-sm text-gray-500" id="modalMessage">Pesan informasi</p>
+                </div>
+            </div>
+            <div class="mt-6 text-center">
+                <button type="button" onclick="closeModal()" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none sm:text-sm">
+                    Tutup
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script Logika -->
+    <script>
+        // Konfigurasi API
+        const apiKey = ""; // API Key disuntikkan secara runtime
+        
+        // Setup PDF.js Worker
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+
+        // Data Pembina
+        const daftarPembina = [
+            { fakultas: "FIPP", nama: "Hendra Dedi Kriswanto, S.Pd., M. Pd" },
+            { fakultas: "FIPP", nama: "Khairul Arifin, M.Pd." },
+            { fakultas: "FBS", nama: "Ria Fitrasih, S.Pd., M.Pd" },
+            { fakultas: "FBS", nama: "Dwi Pangesti Aprilia, S.Pd., M. Pd" },
+            { fakultas: "FISIP", nama: "Dr. Nurul Fatimah, S.Pd. M.Si" },
+            { fakultas: "FMIPA", nama: "Devy Lestari, S.Pd., M.Pd." },
+            { fakultas: "FT", nama: "Juwita Ria Rumondang, S.Pd., M.Pd." },
+            { fakultas: "FIK", nama: "Ayutisa Rizqinada, S.Pd., M.Pd" },
+            { fakultas: "FEB", nama: "Erisa Aprilia Wicaksari, SE., MM" },
+            { fakultas: "FH", nama: "Yustina Dhian Novita, SH., MH" },
+            { fakultas: "FK", nama: "Dr. sc. hum. Chatila Maharani, ST., M. Kes" },
+            { fakultas: "FK", nama: "Yanesti Nuravianda Lestari, S.Gz., M. Gizi" }
+        ];
+
+        // Rubrik Penilaian
+        const rubrik = [
+            { id: "q1", aspek: "Latar Belakang & Tujuan Mulia (Noble Purpose)", bobot: 15, deskripsi: "Mengukur urgensi masalah dan dampak sosial/lingkungan dari usaha.", opsi: [ { skor: 100, label: "Sangat Sesuai: Masalah tajam, solutif, dampak noble purpose sangat jelas." }, { skor: 75, label: "Sesuai: Masalah jelas, noble purpose kurang ditekankan." }, { skor: 50, label: "Kurang Sesuai: Latar belakang standar, tidak ada dampak sosial." }, { skor: 20, label: "Tidak Sesuai: Hanya mencari untung, landasan tidak jelas." } ] },
+            { id: "q2", aspek: "Segmen Pelanggan & Potensi Pasar", bobot: 15, deskripsi: "Pemahaman tim terhadap siapa yang akan membeli produk mereka.", opsi: [ { skor: 100, label: "Sangat Sesuai: Target spesifik, terukur, divalidasi dengan data." }, { skor: 75, label: "Sesuai: Target jelas tapi kurang dukungan data empiris." }, { skor: 50, label: "Kurang Sesuai: Target pasar terlalu luas (misal: 'semua kalangan')." }, { skor: 20, label: "Tidak Sesuai: Tidak paham siapa pelanggan." } ] },
+            { id: "q3", aspek: "Inovasi Produk / Jasa", bobot: 20, deskripsi: "Keunikan produk/jasa dibandingkan yang sudah ada di pasaran.", opsi: [ { skor: 100, label: "Sangat Sesuai: Inovasi unik, keunggulan kompetitif sangat kuat." }, { skor: 75, label: "Sesuai: Produk bagus, sedikit perbedaan dengan pesaing." }, { skor: 50, label: "Kurang Sesuai: Produk pasaran, minim inovasi." }, { skor: 20, label: "Tidak Sesuai: Produk usang atau tidak logis." } ] },
+            { id: "q4", aspek: "Strategi Pemasaran & Saluran Distribusi", bobot: 15, deskripsi: "Cara produk sampai ke tangan pelanggan (Marketing Strategy).", opsi: [ { skor: 100, label: "Sangat Sesuai: Strategi aplikatif, logis, platform relevan." }, { skor: 75, label: "Sesuai: Ada strategi tapi kurang spesifik." }, { skor: 50, label: "Kurang Sesuai: Hanya mengandalkan promosi medsos biasa." }, { skor: 20, label: "Tidak Sesuai: Tidak ada strategi." } ] },
+            { id: "q5", aspek: "Sumber Daya Manusia (Tim)", bobot: 15, deskripsi: "Pembagian peran dan kompetensi anggota tim.", opsi: [ { skor: 100, label: "Sangat Sesuai: Komposisi lintas disiplin, peran jelas sesuai keahlian." }, { skor: 75, label: "Sesuai: Peran jelas, kompetensi tim kurang beragam." }, { skor: 50, label: "Kurang Sesuai: Peran tumpang tindih, tidak relevan." }, { skor: 20, label: "Tidak Sesuai: Tidak jelas siapa mengerjakan apa." } ] },
+            { id: "q6", aspek: "Rencana Anggaran Biaya (RAB)", bobot: 20, deskripsi: "Kesesuaian komponen RAB dengan ketentuan panduan P2MW 2026.", opsi: [ { skor: 100, label: "Sangat Sesuai: RAB rasional, mematuhi batas pagu dan komponen panduan." }, { skor: 75, label: "Sesuai: RAB masuk akal, ada minor komponen kurang efektif." }, { skor: 50, label: "Kurang Sesuai: RAB mengada-ada atau honorarium menyalahi panduan." }, { skor: 20, label: "Tidak Sesuai: RAB tidak merujuk panduan." } ] }
+        ];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('evalDate').valueAsDate = new Date();
+
+            const reviewerSelect = document.getElementById('reviewerName');
+            daftarPembina.forEach(pembina => {
+                const option = document.createElement('option');
+                option.value = pembina.nama;
+                option.textContent = `[${pembina.fakultas}] - ${pembina.nama}`;
+                reviewerSelect.appendChild(option);
+            });
+
+            const rubricContainer = document.getElementById('rubricContainer');
+            rubrik.forEach((item, index) => {
+                const div = document.createElement('div');
+                div.className = "p-4 bg-gray-50 rounded-lg border border-gray-200 transition-colors duration-300";
+                div.id = `container-${item.id}`;
+                
+                let optionsHtml = '';
+                item.opsi.forEach((opt) => {
+                    let textColor = "text-gray-700";
+                    if(opt.skor >= 75) textColor = "text-green-700 font-medium";
+                    else if(opt.skor <= 50) textColor = "text-red-600 font-medium";
+
+                    optionsHtml += `
+                        <label class="flex items-start space-x-3 p-2 hover:bg-white rounded cursor-pointer transition-colors">
+                            <input type="radio" name="${item.id}" value="${opt.skor}" data-bobot="${item.bobot}" class="form-radio mt-1 h-4 w-4 text-blue-600 rubric-radio">
+                            <span class="text-sm ${textColor}">${opt.label}</span>
+                        </label>
+                    `;
+                });
+
+                div.innerHTML = `
+                    <div class="mb-3">
+                        <h3 class="font-bold text-gray-800">${index + 1}. ${item.aspek} <span class="text-xs ml-2 bg-blue-100 text-blue-800 px-2 py-1 rounded">Bobot: ${item.bobot}%</span></h3>
+                        <p class="text-xs text-gray-500 mt-1">${item.deskripsi}</p>
+                    </div>
+                    <div class="space-y-1 pl-2 border-l-2 border-gray-300">
+                        ${optionsHtml}
+                    </div>
+                    <div id="ai-reason-${item.id}" class="hidden mt-3 p-3 bg-indigo-50 border border-indigo-100 rounded text-sm text-indigo-800 italic">
+                        <i class="fas fa-robot mr-1"></i> <b>Analisis AI:</b> <span></span>
+                    </div>
+                `;
+                rubricContainer.appendChild(div);
+            });
+
+            const radios = document.querySelectorAll('.rubric-radio');
+            radios.forEach(radio => radio.addEventListener('change', calculateScore));
+            
+            const checks = document.querySelectorAll('.admin-check');
+            checks.forEach(check => check.addEventListener('change', calculateScore));
+        });
+
+        // ==================== FUNGSI AI & PDF ====================
+
+        async function processPDF() {
+            const fileInput = document.getElementById('pdfUpload');
+            if (fileInput.files.length === 0) {
+                showModal("Perhatian", "Silakan unggah file PDF proposal terlebih dahulu.", "warning");
+                return;
+            }
+
+            const file = fileInput.files[0];
+            if (file.type !== "application/pdf") {
+                showModal("Error", "Format file harus PDF.", "error");
+                return;
+            }
+
+            setLoading(true, "Membaca teks dari PDF...");
+            
+            try {
+                const text = await extractText(file);
+                if(text.length < 100) throw new Error("Teks terlalu pendek atau PDF berisi gambar hasil scan.");
+
+                setLoading(true, "Mengirim ke AI untuk dianalisis (membutuhkan waktu hingga 30 detik)...");
+                await analyzeWithGemini(text);
+
+            } catch (error) {
+                console.error(error);
+                showModal("Gagal Membaca Proposal", "Terjadi kesalahan: " + error.message, "error");
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        async function extractText(file) {
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
+            let text = "";
+            // Batasi hingga 30 halaman awal agar tidak terlalu berat di browser
+            const maxPages = Math.min(pdf.numPages, 30); 
+            
+            for (let i = 1; i <= maxPages; i++) {
+                const page = await pdf.getPage(i);
+                const content = await page.getTextContent();
+                const strings = content.items.map(item => item.str);
+                text += strings.join(" ") + "\n";
+            }
+            return text;
+        }
+
+        async function analyzeWithGemini(text) {
+            const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            
+            const systemPrompt = `Anda adalah Reviewer/Pembina P2MW 2026 yang tegas. Analisis proposal mahasiswa berikut. 
+Tugas Anda:
+1. Temukan Judul Proposal dan Kategori Usaha. Kategori harus salah satu dari: "Makanan dan Minuman", "Budidaya", "Industri Kreatif, Seni, dan Budaya", "Jasa dan Perdagangan", "Manufaktur dan Teknologi Terapan", "Bisnis Digital".
+2. Nilai 6 kriteria rubrik dengan skor (100, 75, 50, atau 20) berdasarkan panduan. Berikan juga alasan logis (1-2 kalimat) mengapa mendapat skor tersebut.
+3. Berikan saran/catatan perbaikan umum.
+
+Kriteria:
+q1: Latar Belakang & Tujuan Mulia.
+q2: Segmen Pelanggan & Potensi Pasar.
+q3: Inovasi Produk.
+q4: Strategi Pemasaran.
+q5: SDM (Tim).
+q6: RAB (Apakah sesuai panduan/realistis?).`;
+
+            const schema = {
+                type: "OBJECT",
+                properties: {
+                    judul_proposal: { type: "STRING" },
+                    kategori_usaha: { type: "STRING" },
+                    q1_skor: { type: "NUMBER", description: "Pilih: 100, 75, 50, 20" },
+                    q1_alasan: { type: "STRING" },
+                    q2_skor: { type: "NUMBER", description: "Pilih: 100, 75, 50, 20" },
+                    q2_alasan: { type: "STRING" },
+                    q3_skor: { type: "NUMBER", description: "Pilih: 100, 75, 50, 20" },
+                    q3_alasan: { type: "STRING" },
+                    q4_skor: { type: "NUMBER", description: "Pilih: 100, 75, 50, 20" },
+                    q4_alasan: { type: "STRING" },
+                    q5_skor: { type: "NUMBER", description: "Pilih: 100, 75, 50, 20" },
+                    q5_alasan: { type: "STRING" },
+                    q6_skor: { type: "NUMBER", description: "Pilih: 100, 75, 50, 20" },
+                    q6_alasan: { type: "STRING" },
+                    catatan_pembina: { type: "STRING" }
+                }
+            };
+
+            const payload = {
+                contents: [{ parts: [{ text: "Teks Proposal:\n" + text.substring(0, 30000) }] }], // limit char
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: schema
+                }
+            };
+
+            // Implementasi Exponential Backoff
+            let delay = 1000;
+            let result = null;
+            for(let i=0; i<5; i++){
+                try {
+                    const response = await fetch(endpoint, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(payload)
+                    });
+                    
+                    if(!response.ok) throw new Error("API Error: " + response.status);
+                    
+                    const data = await response.json();
+                    result = JSON.parse(data.candidates[0].content.parts[0].text);
+                    break; // Berhasil, keluar dari loop
+                } catch (e) {
+                    if (i === 4) throw new Error("Gagal terhubung ke AI setelah beberapa percobaan.");
+                    await new Promise(r => setTimeout(r, delay));
+                    delay *= 2;
+                }
+            }
+
+            if(result) {
+                applyAIDataToForm(result);
+            }
+        }
+
+        function applyAIDataToForm(data) {
+            // Isi Form
+            document.getElementById('proposalTitle').value = data.judul_proposal || '';
+            
+            // Set kategori jika ada yang cocok
+            const katSelect = document.getElementById('kategori');
+            Array.from(katSelect.options).forEach(opt => {
+                if(data.kategori_usaha && opt.value.toLowerCase().includes(data.kategori_usaha.toLowerCase())) {
+                    katSelect.value = opt.value;
+                }
+            });
+
+            // Isi Catatan
+            document.getElementById('feedback').value = "[DRAF AI] " + (data.catatan_pembina || '');
+
+            // Isi Radio dan Alasan
+            const kriteria = ['q1', 'q2', 'q3', 'q4', 'q5', 'q6'];
+            kriteria.forEach(k => {
+                const skor = data[`${k}_skor`];
+                const alasan = data[`${k}_alasan`];
+                
+                if (skor) {
+                    // Cari radio terdekat dengan nilai dari AI
+                    const validValues = [100, 75, 50, 20];
+                    const closest = validValues.reduce((prev, curr) => Math.abs(curr - skor) < Math.abs(prev - skor) ? curr : prev);
+                    
+                    const radio = document.querySelector(`input[name="${k}"][value="${closest}"]`);
+                    if(radio) {
+                        radio.checked = true;
+                        // Highlight area sebagai indikasi diisi AI
+                        const container = document.getElementById(`container-${k}`);
+                        container.classList.add('bg-indigo-50', 'border-indigo-300');
+                        setTimeout(() => container.classList.remove('bg-indigo-50', 'border-indigo-300'), 3000);
+                    }
+                }
+
+                if (alasan) {
+                    const reasonDiv = document.getElementById(`ai-reason-${k}`);
+                    reasonDiv.classList.remove('hidden');
+                    reasonDiv.querySelector('span').textContent = alasan;
+                }
+            });
+
+            calculateScore();
+            showModal("Analisis Selesai", "Sistem AI telah mengisi form berdasarkan isi proposal. Mohon verifikasi kembali kesesuaian nilai dan administrasinya sebelum mencetak.", "success");
+        }
+
+        function setLoading(isLoading, text = "") {
+            const btn = document.getElementById('analyzeBtn');
+            const status = document.getElementById('loadingStatus');
+            const statusText = document.getElementById('loadingText');
+            
+            if(isLoading) {
+                btn.disabled = true;
+                btn.classList.add('opacity-50', 'cursor-not-allowed');
+                status.classList.remove('hidden');
+                status.classList.add('flex');
+                statusText.textContent = text;
+            } else {
+                btn.disabled = false;
+                btn.classList.remove('opacity-50', 'cursor-not-allowed');
+                status.classList.add('hidden');
+                status.classList.remove('flex');
+            }
+        }
+
+        // ==================== FUNGSI KALKULASI ====================
+
+        function calculateScore() {
+            const radios = document.querySelectorAll('.rubric-radio:checked');
+            let totalScore = 0;
+            let answeredCount = 0;
+
+            radios.forEach(radio => {
+                const val = parseFloat(radio.value);
+                const weight = parseFloat(radio.getAttribute('data-bobot')) / 100;
+                totalScore += (val * weight);
+                answeredCount++;
+            });
+
+            const scoreDisplay = document.getElementById('totalScoreDisplay');
+            const statusBadge = document.getElementById('statusBadge');
+            
+            scoreDisplay.textContent = totalScore.toFixed(2);
+
+            const adminChecks = document.querySelectorAll('.admin-check');
+            let allAdminChecked = true;
+            adminChecks.forEach(chk => { if(!chk.checked) allAdminChecked = false; });
+
+            if(answeredCount < rubrik.length) {
+                statusBadge.textContent = "Belum Selesai Dinilai";
+                statusBadge.className = "mt-2 inline-block px-4 py-1 rounded-full text-sm font-bold bg-gray-400 text-white";
+                scoreDisplay.className = "text-5xl font-black text-gray-400";
+            } else {
+                if (!allAdminChecked) {
+                    statusBadge.textContent = "DITOLAK - Administrasi Tidak Lengkap";
+                    statusBadge.className = "mt-2 inline-block px-4 py-1 rounded-full text-sm font-bold bg-red-600 text-white";
+                    scoreDisplay.className = "text-5xl font-black text-red-500";
+                } else if (totalScore >= 80) {
+                    statusBadge.textContent = "DIREKOMENDASIKAN LOLOS";
+                    statusBadge.className = "mt-2 inline-block px-4 py-1 rounded-full text-sm font-bold bg-green-500 text-white";
+                    scoreDisplay.className = "text-5xl font-black text-green-500";
+                } else if (totalScore >= 60) {
+                    statusBadge.textContent = "PERLU REVISI MAYOR";
+                    statusBadge.className = "mt-2 inline-block px-4 py-1 rounded-full text-sm font-bold bg-yellow-500 text-white";
+                    scoreDisplay.className = "text-5xl font-black text-yellow-500";
+                } else {
+                    statusBadge.textContent = "TIDAK DIREKOMENDASIKAN";
+                    statusBadge.className = "mt-2 inline-block px-4 py-1 rounded-full text-sm font-bold bg-red-600 text-white";
+                    scoreDisplay.className = "text-5xl font-black text-red-500";
+                }
+            }
+        }
+
+        // ==================== MODAL UI ====================
+        
+        function showModal(title, message, type = "info") {
+            const modal = document.getElementById('messageModal');
+            const content = document.getElementById('messageModalContent');
+            const icon = document.getElementById('modalIcon');
+            const iconContainer = document.getElementById('modalIconContainer');
+            
+            document.getElementById('modalTitle').textContent = title;
+            document.getElementById('modalMessage').textContent = message;
+
+            if (type === "error") {
+                icon.className = "fas fa-exclamation-triangle text-red-600 text-xl";
+                iconContainer.className = "mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4";
+            } else if (type === "warning") {
+                icon.className = "fas fa-exclamation text-yellow-600 text-xl";
+                iconContainer.className = "mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-yellow-100 mb-4";
+            } else if (type === "success") {
+                icon.className = "fas fa-check text-green-600 text-xl";
+                iconContainer.className = "mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 mb-4";
+            } else {
+                icon.className = "fas fa-info-circle text-blue-600 text-xl";
+                iconContainer.className = "mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 mb-4";
+            }
+
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                content.classList.remove('scale-95', 'opacity-0');
+                content.classList.add('scale-100', 'opacity-100');
+            }, 10);
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('messageModal');
+            const content = document.getElementById('messageModalContent');
+            
+            content.classList.remove('scale-100', 'opacity-100');
+            content.classList.add('scale-95', 'opacity-0');
+            
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 200);
+        }
+    </script>
+</body>
+</html>
