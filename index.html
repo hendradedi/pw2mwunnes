@@ -10,6 +10,21 @@
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyC7OnhSiMDfTOwb0enqvPNPZqx1M0g84ps",
+      authDomain: "p2mw-nilai26.firebaseapp.com",
+      projectId: "p2mw-nilai26",
+      storageBucket: "p2mw-nilai26.firebasestorage.app",
+      messagingSenderId: "970168657649",
+      appId: "1:970168657649:web:6263e7a1ef9acb9178eb50"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+  </script>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
   <style>
     body{font-family:'Plus Jakarta Sans',sans-serif;}
@@ -195,12 +210,30 @@ function exportExcel(allReviews){
 }
 
 // ── ADMIN DASHBOARD ───────────────────────────────────────────────
-function AdminDashboard({onClose, allReviews}){
+function AdminDashboard({onClose, allReviews, db}){
   const [tab,setTab]=React.useState("overview");
   const [filterFak,setFilterFak]=React.useState("Semua");
+  const [allData,setAllData]=React.useState(allReviews);
+  const [loading,setLoading]=React.useState(true);
+
+  // Load SEMUA data dari Firestore saat Admin Dashboard dibuka
+  React.useEffect(()=>{
+    if(!db){setLoading(false);return;}
+    setLoading(true);
+    db.collection("penilaian").get().then(snap=>{
+      const data=[];
+      snap.forEach(doc=>data.push(doc.data()));
+      setAllData(data);
+      setLoading(false);
+    }).catch(e=>{
+      console.error("Firebase load error:",e);
+      setAllData(allReviews); // fallback ke data lokal
+      setLoading(false);
+    });
+  },[]);
 
   const WEIGHTS={q1:0.15,q2:0.20,q3:0.20,q4:0.20,q5:0.15,q6:0.10};
-  const doneReviews = allReviews.filter(r=>r.done);
+  const doneReviews = allData.filter(r=>r.done);
   const totalProposals = PROPOSALS_DATA.length;
   const uniqueDone = new Set(doneReviews.map(r=>r.proposal.no+"-"+r.slot)).size;
   const totalSlots = totalProposals * 2;
@@ -250,7 +283,7 @@ function AdminDashboard({onClose, allReviews}){
                 <p className="text-indigo-200 text-sm mt-1">Monitor progress penilaian seluruh reviewer</p>
               </div>
               <div className="flex gap-2">
-                <button onClick={()=>exportExcel(allReviews)}
+                <button onClick={()=>exportExcel(allData)}
                   className="bg-green-500 hover:bg-green-400 text-white px-4 py-2 rounded-xl font-semibold text-sm flex items-center gap-2">
                   📥 Export Excel
                 </button>
@@ -284,6 +317,12 @@ function AdminDashboard({onClose, allReviews}){
             ))}
           </div>
 
+          {loading&&(
+            <div className="p-12 text-center">
+              <div className="text-4xl mb-3">🔥</div>
+              <div className="font-semibold text-slate-600">Memuat data dari Firebase...</div>
+            </div>
+          )}
           <div className="p-6">
             {/* OVERVIEW TAB */}
             {tab==="overview" && (
@@ -599,9 +638,44 @@ function ReviewScreen({proposal, reviewer, slot, onBack, onDone}){
     try{return localStorage.getItem(storageKey+"_saran")||"";}
     catch{return "";}
   });
+  const [fbSyncStatus,setFbSyncStatus]=useState("");
+  // Load dari Firebase jika localStorage kosong (misal buka di device lain)
+  React.useEffect(()=>{
+    const draftId="draft_p"+proposal.no+"_s"+slot+"_"+encodeURIComponent(reviewer.split(",")[0].trim().replace(/ /g,"_").substring(0,20));
+    const finalId="p"+proposal.no+"_s"+slot+"_"+encodeURIComponent(reviewer.split(",")[0].trim().replace(/ /g,"_").substring(0,20));
+    // Coba load dari penilaian final dulu
+    db.collection("penilaian").doc(finalId).get().then(doc=>{
+      if(doc.exists){
+        const d=doc.data();
+        if(d.scores&&Object.keys(d.scores).length>0){
+          setScores(d.scores);
+          if(d.adminChecks) setAdminChecks(d.adminChecks);
+          if(d.komentar) setKomentar(d.komentar);
+          if(d.saran) setSaran(d.saran);
+          setFbSyncStatus("✅ Data dimuat dari server");
+          setTimeout(()=>setFbSyncStatus(""),3000);
+        }
+      } else {
+        // Coba draft
+        db.collection("drafts").doc(draftId).get().then(doc2=>{
+          if(doc2.exists){
+            const d=doc2.data();
+            if(d.scores&&Object.keys(d.scores).length>0){
+              setScores(d.scores);
+              if(d.adminChecks) setAdminChecks(d.adminChecks);
+              if(d.komentar) setKomentar(d.komentar);
+              if(d.saran) setSaran(d.saran);
+              setFbSyncStatus("🔄 Draft dimuat dari server");
+              setTimeout(()=>setFbSyncStatus(""),3000);
+            }
+          }
+        }).catch(()=>{});
+      }
+    }).catch(()=>{});
+  },[]);
   const [openGuide,setOpenGuide]=useState(null);
 
-  // Auto-save ke localStorage setiap perubahan
+  // Auto-save draft ke localStorage (backup lokal) + Firebase
   React.useEffect(()=>{
     try{localStorage.setItem(storageKey+"_scores",JSON.stringify(scores));}catch{}
   },[scores]);
@@ -614,6 +688,24 @@ function ReviewScreen({proposal, reviewer, slot, onBack, onDone}){
   React.useEffect(()=>{
     try{localStorage.setItem(storageKey+"_saran",saran);}catch{}
   },[saran]);
+  // Auto-save draft ke Firestore setiap 10 detik jika ada perubahan
+  React.useEffect(()=>{
+    if(Object.keys(scores).length===0)return;
+    const t=setTimeout(()=>{
+      const draftId="draft_p"+proposal.no+"_s"+slot+"_"+encodeURIComponent(reviewer.split(",")[0].trim().replace(/ /g,"_").substring(0,20));
+      try{
+        db.collection("drafts").doc(draftId).set({
+          proposal,reviewer,slot,
+          scores:{...scores},
+          adminChecks:{...adminChecks},
+          komentar,saran,
+          done:false,
+          updatedAt:firebase.firestore.FieldValue.serverTimestamp()
+        });
+      }catch(e){console.log("Draft save:",e);}
+    },10000);
+    return()=>clearTimeout(t);
+  },[scores,komentar,saran]);
 
   // AI state
   const [pdfText,setPdfText]=useState("");
@@ -798,6 +890,7 @@ Balas HANYA JSON (tanpa markdown):
             <button onClick={onBack} className="bg-white/20 hover:bg-white/30 text-white text-xs font-bold px-3 py-1.5 rounded-lg shrink-0">← Kembali</button>
             <div className="flex-1 min-w-0">
               <div className="text-xs text-blue-200">#{proposal.no} · {proposal.fakultas} · Reviewer {slot}</div>
+            {fbSyncStatus&&<div className="text-xs bg-white/20 px-2 py-0.5 rounded-full mt-1">{fbSyncStatus}</div>}
               <div className="font-bold text-sm truncate">{proposal.judul}</div>
             </div>
             {rec
@@ -1237,53 +1330,84 @@ function App(){
   const [cur,setCur]=useState(null);
   const [slot,setSlot]=useState(1);
   const [showAdmin,setShowAdmin]=useState(false);
-  const [allReviews,setAllReviews]=useState(()=>{
-    try{const v=localStorage.getItem("p2mw26_reviews");return v?JSON.parse(v):[];}
-    catch{return [];}
-  });
-  const [doneSet,setDoneSet]=useState(()=>{
-    try{
-      const v=localStorage.getItem("p2mw26_done");
-      const fromDone = v?new Set(JSON.parse(v)):new Set();
-      // Fallback: populate dari allReviews jika ada
-      const rv=localStorage.getItem("p2mw26_reviews");
-      if(rv){
-        const reviews=JSON.parse(rv);
-        reviews.filter(r=>r.done).forEach(r=>{
-          fromDone.add(r.proposal.no+"-"+r.slot);
-        });
-      }
-      return fromDone;
-    }
-    catch{return new Set();}
-  });
+  const [allReviews,setAllReviews]=useState([]);
+  const [doneSet,setDoneSet]=useState(new Set());
+  const [fbLoading,setFbLoading]=useState(false);
+  const [fbStatus,setFbStatus]=useState("");
 
-  const markDone=(no, reviewData)=>{
-    const slotKey = no+"-"+(reviewData?.slot||1);
-    setDoneSet(prev=>{
-      const n=new Set(prev);n.add(slotKey);
-      try{localStorage.setItem("p2mw26_done",JSON.stringify([...n]));}catch{}
-      return n;
-    });
-    if(reviewData){
-      setAllReviews(prev=>{
-        const updated=[...prev.filter(r=>!(r.proposal?.no===reviewData.proposal?.no&&r.slot===reviewData.slot)),reviewData];
-        try{localStorage.setItem("p2mw26_reviews",JSON.stringify(updated));}catch{}
-        return updated;
+  // Load semua data dari Firestore saat reviewer login
+  const loadFromFirebase=async(rev)=>{
+    setFbLoading(true);
+    setFbStatus("Memuat data dari server...");
+    try{
+      const snap=await db.collection("penilaian").where("reviewer","==",rev).get();
+      const reviews=[];
+      const done=new Set();
+      snap.forEach(doc=>{
+        const d=doc.data();
+        reviews.push(d);
+        if(d.done) done.add(d.proposal.no+"-"+d.slot);
       });
+      setAllReviews(reviews);
+      setDoneSet(done);
+      setFbStatus("");
+    }catch(e){
+      setFbStatus("⚠️ Gagal koneksi: "+e.message);
+    }finally{
+      setFbLoading(false);
     }
+  };
+
+  const markDone=async(no, reviewData)=>{
+    const slotKey=no+"-"+(reviewData?.slot||1);
+    // Simpan ke Firestore
+    if(reviewData){
+      const docId="p"+reviewData.proposal.no+"_s"+reviewData.slot+"_"+encodeURIComponent(reviewData.reviewer.split(",")[0].trim().replace(/\s+/g,"_").substring(0,20));
+      try{
+        await db.collection("penilaian").doc(docId).set({
+          ...reviewData,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        setFbStatus("✅ Tersimpan ke server!");
+        setTimeout(()=>setFbStatus(""),3000);
+      }catch(e){
+        setFbStatus("⚠️ Gagal simpan: "+e.message);
+      }
+    }
+    setDoneSet(prev=>{const n=new Set(prev);n.add(slotKey);return n;});
+    setAllReviews(prev=>[...prev.filter(r=>!(r.proposal?.no===reviewData?.proposal?.no&&r.slot===reviewData?.slot)),reviewData]);
     setScreen("dashboard");window.scrollTo(0,0);
   };
 
-  if(screen==="login") return <LoginScreen onLogin={n=>{setReviewer(n);setScreen("dashboard");}}/>;
+  const handleLogin=(rev)=>{
+    setReviewer(rev);
+    setScreen("dashboard");
+    loadFromFirebase(rev);
+  };
+
+  if(screen==="login") return <LoginScreen onLogin={handleLogin}/>;
   if(screen==="review"&&cur) return <ReviewScreen proposal={cur} reviewer={reviewer} slot={slot}
     onBack={()=>{setScreen("dashboard");window.scrollTo(0,0);}} onDone={markDone}/>;
   return <>
+    {fbLoading&&(
+      <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
+        <div className="bg-white rounded-2xl p-8 text-center shadow-2xl">
+          <div className="text-4xl mb-3">🔥</div>
+          <div className="font-bold text-slate-700">{fbStatus||"Menghubungkan ke Firebase..."}</div>
+          <div className="text-xs text-slate-400 mt-1">Mohon tunggu sebentar</div>
+        </div>
+      </div>
+    )}
+    {fbStatus&&!fbLoading&&(
+      <div className="fixed top-4 right-4 z-50 bg-emerald-600 text-white px-4 py-2 rounded-xl shadow-lg text-sm font-semibold">
+        {fbStatus}
+      </div>
+    )}
     <DashboardScreen reviewer={reviewer} doneSet={doneSet}
       onSelect={(p,s)=>{setCur(p);setSlot(s);setScreen("review");window.scrollTo(0,0);}}
-      onLogout={()=>{setReviewer("");setScreen("login");}}
+      onLogout={()=>{setReviewer("");setScreen("login");setDoneSet(new Set());setAllReviews([]);}}
       onAdmin={()=>setShowAdmin(true)}/>
-    {showAdmin&&<AdminDashboard allReviews={allReviews} onClose={()=>setShowAdmin(false)}/>}
+    {showAdmin&&<AdminDashboard allReviews={allReviews} onClose={()=>setShowAdmin(false)} db={db}/>}
   </>;
 }
 
